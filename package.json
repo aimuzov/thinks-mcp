@@ -1,0 +1,73 @@
+{
+  "name": "@aimuzov/thinks-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that writes, replies and rephrases in your own voice, learned from a Telegram export. Hands the calling model a measured style profile and your real messages — no API keys, no generation of its own.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "claude",
+    "claude-code",
+    "claude-desktop",
+    "cowork",
+    "ai",
+    "llm",
+    "stdio",
+    "telegram",
+    "writing-style",
+    "personal-voice",
+    "style-transfer",
+    "russian"
+  ],
+  "homepage": "https://github.com/aimuzov/aimuzov-thinks-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/aimuzov/aimuzov-thinks-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aimuzov/aimuzov-thinks-mcp.git"
+  },
+  "license": "MIT",
+  "author": "Aleksey Imuzov",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "thinks-mcp": "./build/index.js"
+  },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE",
+    ".mcp.json.example"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js",
+    "dev": "tsc --watch",
+    "start": "node build/index.js",
+    "corpus": "node --max-old-space-size=8192 build/index.js build",
+    "profile": "node build/index.js profile",
+    "where": "node build/index.js where",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "prepublishOnly": "npm run typecheck && npm run format:check && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "prettier": "3.8.4",
+    "typescript": "5.9.3",
+    "vitest": "4.1.8"
+  },
+  "packageManager": "pnpm@11.5.1"
+}

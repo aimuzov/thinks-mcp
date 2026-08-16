@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aimuzov-thinks": {
+      "command": "/opt/homebrew/bin/mise",
+      "args": ["exec", "npm:@aimuzov/thinks-mcp", "--", "thinks-mcp"]
+    }
+  }
+}

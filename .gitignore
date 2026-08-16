@@ -1,0 +1,18 @@
+node_modules/
+build/
+*.tgz
+
+# The Telegram export and everything derived from it. Never commit: this is
+# private correspondence, and the index keeps message text verbatim.
+data/
+dump.json
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+.env
+.env.local
+
+# Machine-specific MCP host config (absolute paths)
+.mcp.json
