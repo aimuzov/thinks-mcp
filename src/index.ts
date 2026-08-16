@@ -27,7 +27,7 @@ const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозито
   where             показать, где лежат корпус и профиль
 
 Переменные окружения:
-  THINKS_DATA_DIR   каталог с индексом (по умолчанию ~/.config/aimuzov-thinks-mcp)
+  THINKS_DATA_DIR   каталог с индексом (по умолчанию ~/.config/thinks-mcp)
   THINKS_DUMP       путь к выгрузке, если не передан аргументом
   THINKS_DB         путь к файлу индекса
   THINKS_OWNER_ID   id владельца, если автоопределение ошиблось

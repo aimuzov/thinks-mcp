@@ -51,7 +51,7 @@ const DEFAULT_RECENT_YEARS = 3
 function defaultDataDir(env: Env): string {
   const xdg = env.XDG_CONFIG_HOME?.trim()
   const base = xdg || join(homedir(), '.config')
-  return join(base, 'aimuzov-thinks-mcp')
+  return join(base, 'thinks-mcp')
 }
 
 /** Build a typed Config from environment variables. Pure: no IO. */

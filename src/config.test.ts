@@ -6,7 +6,7 @@ import { loadConfig } from './config.js'
 describe('loadConfig', () => {
   it('keeps the corpus outside the installed package', () => {
     const cfg = loadConfig({})
-    expect(cfg.dataDir).toBe(join(homedir(), '.config', 'aimuzov-thinks-mcp'))
+    expect(cfg.dataDir).toBe(join(homedir(), '.config', 'thinks-mcp'))
     expect(cfg.dbPath).toBe(join(cfg.dataDir, 'style.db'))
     // A path inside node_modules or a mise cache would be wiped on upgrade.
     expect(cfg.dbPath).not.toMatch(/node_modules|\/build\//)
@@ -14,7 +14,7 @@ describe('loadConfig', () => {
 
   it('honours XDG_CONFIG_HOME', () => {
     const cfg = loadConfig({ XDG_CONFIG_HOME: '/tmp/xdg' })
-    expect(cfg.dataDir).toBe('/tmp/xdg/aimuzov-thinks-mcp')
+    expect(cfg.dataDir).toBe('/tmp/xdg/thinks-mcp')
   })
 
   it('lets THINKS_DATA_DIR override everything derived from it', () => {

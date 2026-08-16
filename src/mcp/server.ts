@@ -23,7 +23,7 @@ export function createServer(cfg: Config): McpServer {
   ensureDataDir(cfg)
 
   const ctx: ToolContext = { cfg, corpus: new CorpusRef(cfg) }
-  const server = new McpServer({ name: 'aimuzov-thinks-mcp', version: VERSION })
+  const server = new McpServer({ name: 'thinks-mcp', version: VERSION })
 
   registerWriteAsMe(server, ctx)
   registerReplyAsMe(server, ctx)
@@ -40,5 +40,5 @@ export function createServer(cfg: Config): McpServer {
 export async function serve(cfg: Config): Promise<void> {
   const server = createServer(cfg)
   await server.connect(new StdioServerTransport())
-  console.error('aimuzov-thinks-mcp running on stdio')
+  console.error('thinks-mcp running on stdio')
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@aimuzov/thinks-mcp",
+  "name": "thinks-mcp",
   "version": "0.1.0",
   "description": "MCP server that writes, replies and rephrases in your own voice, learned from a Telegram export. Hands the calling model a measured style profile and your real messages — no API keys, no generation of its own.",
   "keywords": [
@@ -19,13 +19,13 @@
     "style-transfer",
     "russian"
   ],
-  "homepage": "https://github.com/aimuzov/aimuzov-thinks-mcp#readme",
+  "homepage": "https://github.com/aimuzov/thinks-mcp#readme",
   "bugs": {
-    "url": "https://github.com/aimuzov/aimuzov-thinks-mcp/issues"
+    "url": "https://github.com/aimuzov/thinks-mcp/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aimuzov/aimuzov-thinks-mcp.git"
+    "url": "git+https://github.com/aimuzov/thinks-mcp.git"
   },
   "license": "MIT",
   "author": "Aleksey Imuzov",
@@ -39,6 +39,7 @@
   "files": [
     "build",
     "README.md",
+    "README.ru.md",
     "LICENSE",
     ".mcp.json.example"
   ],
