@@ -15,6 +15,8 @@ export interface TurnRow {
   text: string
   chars: number
   contextIn: string | null
+  /** True when the author quoted that message, false when we inferred it. */
+  contextExplicit: boolean
   /** BM25 score; absent for randomly sampled fallback rows. */
   score?: number
 }
@@ -65,6 +67,22 @@ const MAX_QUERY_TOKENS = 16
  * archive happens to be densest, which is usually years ago.
  */
 const DEFAULT_AGE_PENALTY = 0.12
+
+/**
+ * What an inferred pair costs against a quoted one, in the same BM25 units.
+ *
+ * A quoted reply is a fact — the author picked that message to answer. An
+ * inferred one is "whatever was said last", and it is wrong often enough to
+ * matter. At 1.5 against a typical spread of ~3.5 a quoted pair wins whenever
+ * the two are comparably relevant, while a clearly better inferred match still
+ * gets through; the archive holds far more inferred pairs than quoted ones, so
+ * excluding them outright would empty most briefs.
+ */
+const INFERRED_PAIR_PENALTY = 1.5
+
+/** Extra cost for an inferred pair the author took their time over. */
+const SLOW_REPLY_PENALTY = 0.8
+const SLOW_REPLY_SECONDS = 30 * 60
 
 /** Build an FTS5 OR-query out of free text. Returns null if nothing is left. */
 export function buildMatch(text: string): string | null {
@@ -131,6 +149,7 @@ interface RawRow {
   text: string
   chars: number
   context_in: string | null
+  context_explicit: number
   score?: number
 }
 
@@ -149,12 +168,13 @@ const toRow = (r: RawRow): TurnRow => ({
   text: r.text,
   chars: r.chars,
   contextIn: r.context_in,
+  contextExplicit: r.context_explicit === 1,
   ...(r.score == null ? {} : { score: Math.round(r.score * 1000) / 1000 }),
 })
 
 const COLUMNS =
   't.id, t.register, t.longform, t.chat_key, t.lang, t.ts, t.year, ' +
-  't.parts, t.text, t.chars, t.context_in'
+  't.parts, t.text, t.chars, t.context_in, t.context_explicit'
 
 /**
  * Rank turns against free text with BM25.
@@ -180,10 +200,18 @@ export function searchTurns(
     const penalty = opts.agePenalty ?? DEFAULT_AGE_PENALTY
     const now = opts.now ?? new Date().getUTCFullYear()
 
-    // Lower is better for bm25, so age is added, not subtracted.
+    // Lower is better for bm25, so every penalty is added, not subtracted.
+    // Pair confidence only applies when searching what was said *to* the owner;
+    // for their own turns there is no pair to be confident about.
+    const confidence = opts.matchContext
+      ? `+ (CASE WHEN t.context_explicit = 1 THEN 0 ELSE ${INFERRED_PAIR_PENALTY} END)
+         + (CASE WHEN t.context_explicit = 0 AND t.context_lag > ${SLOW_REPLY_SECONDS}
+                 THEN ${SLOW_REPLY_PENALTY} ELSE 0 END)`
+      : ''
+
     const statement = db.prepare(
       `SELECT ${COLUMNS}, bm25(${table}) AS score,
-              bm25(${table}) + ? * MAX(0, ? - t.year) AS rank
+              bm25(${table}) + ? * MAX(0, ? - t.year) ${confidence} AS rank
          FROM ${table}
          JOIN turn t ON t.id = ${table}.rowid
         WHERE ${table} MATCH ? AND ${where}
@@ -249,6 +277,45 @@ export function allTurns(db: Db, opts: SearchOptions = {}): TurnRow[] {
 export function getTurn(db: Db, id: number): TurnRow | null {
   const row = db.prepare(`SELECT ${COLUMNS} FROM turn t WHERE t.id = ?`).get(id)
   return row ? toRow(asRows([row])[0]) : null
+}
+
+export interface PairStats {
+  turns: number
+  pairs: number
+  quoted: number
+  /** Share of turns that answer something at all. */
+  share: number
+}
+
+/**
+ * How much reply material a register actually holds.
+ *
+ * Worth asking before trusting a result set: a Telegram export of a supergroup
+ * carries almost none of the other participants' messages, so `group` ends up
+ * with pairs in the low tens against thousands of turns. A search still returns
+ * a few of them and looks perfectly healthy.
+ */
+export function pairStats(db: Db, register: Register = 'dm'): PairStats {
+  const { sql: where, params } = filters({ register })
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS turns,
+              SUM(CASE WHEN t.context_in IS NOT NULL THEN 1 ELSE 0 END) AS pairs,
+              SUM(t.context_explicit) AS quoted
+         FROM turn t WHERE ${where}`
+    )
+    .get(...(params as never[])) as
+    | { turns: number; pairs: number | null; quoted: number | null }
+    | undefined
+
+  const turns = row?.turns ?? 0
+  const pairs = row?.pairs ?? 0
+  return {
+    turns,
+    pairs,
+    quoted: row?.quoted ?? 0,
+    share: turns ? pairs / turns : 0,
+  }
 }
 
 /** Turns held out of the index, for the blind acceptance test. */

@@ -29,7 +29,9 @@ const SCHEMA = [
      text       TEXT NOT NULL,
      n_parts    INTEGER NOT NULL,
      chars      INTEGER NOT NULL,
-     context_in TEXT
+     context_in TEXT,
+     context_explicit INTEGER NOT NULL DEFAULT 0,
+     context_lag INTEGER
    )`,
   `CREATE INDEX IF NOT EXISTS turn_register ON turn(register, longform, holdout)`,
   `CREATE INDEX IF NOT EXISTS turn_year ON turn(year)`,
@@ -40,6 +42,13 @@ const SCHEMA = [
      stems, content='', tokenize='unicode61'
    )`,
   `CREATE TABLE IF NOT EXISTS profile (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS blame_cache (
+     repo     TEXT NOT NULL,
+     path     TEXT NOT NULL,
+     blob     TEXT NOT NULL,
+     comments TEXT NOT NULL,
+     PRIMARY KEY (repo, path)
+   )`,
   `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
 ]
 
@@ -56,6 +65,12 @@ export function run(db: Db, sql: string): void {
  */
 const ADDED_COLUMNS: { table: string; column: string; type: string }[] = [
   { table: 'turn', column: 'lang', type: 'TEXT' },
+  {
+    table: 'turn',
+    column: 'context_explicit',
+    type: 'INTEGER NOT NULL DEFAULT 0',
+  },
+  { table: 'turn', column: 'context_lag', type: 'INTEGER' },
 ]
 
 function migrate(db: Db): void {

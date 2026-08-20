@@ -22,8 +22,8 @@ export function insertTurns(
   const insertTurn = db.prepare(
     `INSERT INTO turn
        (id, chat_key, register, longform, holdout, lang, ts, year, parts, text,
-        n_parts, chars, context_in)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        n_parts, chars, context_in, context_explicit, context_lag)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
 
   const base = nextTurnId(db)
@@ -44,7 +44,11 @@ export function insertTurns(
         turn.text,
         turn.parts.length,
         turn.chars,
-        turn.contextIn
+        turn.contextIn,
+        turn.contextExplicit ? 1 : 0,
+        // SQLite binds null but not undefined, and callers building turns by
+        // hand leave optional fields off.
+        turn.contextLag ?? null
       )
     })
     run(db, 'COMMIT')

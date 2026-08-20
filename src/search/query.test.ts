@@ -98,6 +98,42 @@ describe('searchTurns', () => {
   })
 })
 
+describe('pair confidence', () => {
+  const quoted = turn({
+    text: 'Отвечаю на вопрос про доставку.',
+    contextIn: 'Что там с доставкой заказа?',
+    contextExplicit: true,
+  })
+  const inferred = turn({
+    text: 'Случайная реплика не по теме.',
+    contextIn: 'Что там с доставкой заказа?',
+    contextExplicit: false,
+  })
+
+  it('ranks a quoted pair above an inferred one', () => {
+    const fresh = openDb(':memory:')
+    // Inferred first, so order alone cannot explain the result.
+    seed(fresh, [inferred, quoted], new Set())
+
+    const [top] = searchTurns(fresh, 'что с доставкой заказа', {
+      matchContext: true,
+      requireContext: true,
+      limit: 2,
+    })
+    expect(top.contextExplicit).toBe(true)
+  })
+
+  it('leaves ranking alone when searching the owner own turns', () => {
+    const fresh = openDb(':memory:')
+    seed(fresh, [inferred, quoted], new Set())
+
+    // Matching against what the owner said: there is no pair to judge, so the
+    // penalty must not apply and relevance decides.
+    const [top] = searchTurns(fresh, 'случайная реплика', { limit: 2 })
+    expect(top.text).toBe('Случайная реплика не по теме.')
+  })
+})
+
 describe('two corpora in one database', () => {
   const codeTurn = turn({
     text: 'Почему выбран этот таймаут.',

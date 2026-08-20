@@ -64,4 +64,44 @@ export function registerPrompts(server: McpServer, _ctx: ToolContext) {
       ],
     })
   )
+
+  server.registerPrompt(
+    'comment-as-me',
+    {
+      title: 'Прокомментировать как я',
+      description: 'Написать комментарий к коду голосом владельца архива.',
+      argsSchema: {
+        code: z.string().describe('Код, который нужно прокомментировать.'),
+        kind: z
+          .string()
+          .optional()
+          .describe('jsdoc — докблок, иначе инлайн-комментарий.'),
+      },
+    },
+    ({ code, kind }) => {
+      const register = kind === 'jsdoc' ? 'jsdoc' : 'code'
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text:
+                `Вызови write_as_me с register: "${register}" и объясни в brief, ` +
+                `что комментируешь этот код:\n\n${code}\n\n` +
+                'Дальше строго следуй полученному брифу. Комментарий должен ' +
+                'отвечать на «почему так», а не пересказывать код: если ' +
+                'причина не видна и подтвердить её нечем — напиши только ' +
+                'проверяемый факт либо TODO с честной формулировкой незнания.\n\n' +
+                `Затем прогони результат через check_as_me с register: ` +
+                `"${register}" и обязательно передай тот же код параметром ` +
+                '`code` — без него проверка не увидит пересказ. Оценка ниже ' +
+                '85 — перепиши по замечаниям и проверь снова. Покажи только ' +
+                'готовый комментарий.',
+            },
+          },
+        ],
+      }
+    }
+  )
 }

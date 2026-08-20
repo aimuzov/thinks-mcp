@@ -41,7 +41,15 @@ function renderExample(row: TurnRow, n: number): string {
   }
 
   lines.push(`[${n}] ${where}, ${row.year}`)
-  if (row.contextIn) lines.push(`  Мне написали: ${row.contextIn}`)
+  if (row.contextIn) {
+    // Quoted and inferred pairs are not equally trustworthy, and a model that
+    // cannot tell them apart treats a coincidence as an answer.
+    lines.push(
+      row.contextExplicit
+        ? `  Мне написали (я ответил именно на это): ${row.contextIn}`
+        : `  Перед этим написали: ${row.contextIn}`
+    )
+  }
   lines.push('  Я ответил:')
   for (const part of row.parts) lines.push(`    ${part}`)
   return lines.join('\n')

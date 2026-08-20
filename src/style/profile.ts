@@ -132,6 +132,8 @@ export function measureRegisters(
         text: r.text,
         chars: r.chars,
         contextIn: r.contextIn,
+        contextExplicit: r.contextExplicit,
+        contextLag: null,
       }))
     )
   }

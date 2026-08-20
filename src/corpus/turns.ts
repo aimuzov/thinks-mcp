@@ -1,6 +1,6 @@
 import { reject, hasSubstance, type FilterStats } from './filter.js'
 import type { Sanitizer } from './sanitize.js'
-import type { ParsedChat, Turn } from './types.js'
+import type { ParsedChat, ParsedMessage, Turn } from './types.js'
 
 export interface TurnOptions {
   ownerId: string
@@ -17,13 +17,25 @@ const CONTEXT_MAX_AGE_SECONDS = 6 * 3600
 /** Reply context is an excerpt, not a transcript. */
 const CONTEXT_MAX_CHARS = 400
 
+interface PendingContext {
+  text: string
+  ts: number
+  /** The author quoted this message explicitly, rather than us guessing. */
+  explicit: boolean
+}
+
 /**
  * Group a chat's messages into turns.
  *
- * A turn is a run of consecutive owner messages sent within the burst window.
- * This is the unit that matters: a large share of chat messages belong to a run
- * of two or more, so "how they answer" is often several short messages rather
- * than one paragraph. Indexing single messages would quietly teach the opposite.
+ * A turn is a run of consecutive owner messages sent within the burst window,
+ * because "how they answer" is often several short messages rather than one
+ * paragraph. Indexing single messages would quietly teach the opposite.
+ *
+ * Context comes from one of two places, and the difference matters. With
+ * `reply_to_message_id` the pairing is a fact. Without it we guess "whatever
+ * was said last", and that guess fails where chat is most ordinary: someone
+ * writes "Извини", the author answers about something else, and the pair
+ * teaches a model to reply off-topic. Both are kept, both are labelled.
  */
 export function buildTurns(
   chat: ParsedChat,
@@ -32,13 +44,14 @@ export function buildTurns(
   stats: FilterStats
 ): Turn[] {
   const turns: Turn[] = []
+  const byId = new Map<number, ParsedMessage>()
+  for (const m of chat.messages) byId.set(m.id, m)
 
   let parts: string[] = []
   let startTs = 0
   let lastTs = 0
-  let contextIn: string | null = null
-  let pendingContext: string | null = null
-  let pendingContextTs = 0
+  let context: PendingContext | null = null
+  let pending: PendingContext | null = null
 
   const flush = () => {
     if (!parts.length) return
@@ -53,10 +66,27 @@ export function buildTurns(
       parts,
       text,
       chars,
-      contextIn,
+      contextIn: context?.text ?? null,
+      contextExplicit: context?.explicit ?? false,
+      contextLag: context ? Math.max(0, startTs - context.ts) : null,
     })
     parts = []
-    contextIn = null
+    context = null
+  }
+
+  /** The message this one quotes, if it is someone else's and has text. */
+  const quoted = (m: ParsedMessage): PendingContext | null => {
+    if (!m.replyToId) return null
+    const target = byId.get(m.replyToId)
+    if (!target || target.fromId === opts.ownerId) return null
+
+    const text = san.clean(target.entities)
+    if (!text || !hasSubstance(text)) return null
+    return {
+      text: text.slice(0, CONTEXT_MAX_CHARS),
+      ts: target.ts,
+      explicit: true,
+    }
   }
 
   for (const m of chat.messages) {
@@ -66,8 +96,11 @@ export function buildTurns(
       // the owner says next, provided they answer within a few hours.
       const incoming = san.clean(m.entities)
       if (incoming && hasSubstance(incoming)) {
-        pendingContext = incoming.slice(0, CONTEXT_MAX_CHARS)
-        pendingContextTs = m.ts
+        pending = {
+          text: incoming.slice(0, CONTEXT_MAX_CHARS),
+          ts: m.ts,
+          explicit: false,
+        }
       }
       stats['not-owner']++
       continue
@@ -98,13 +131,14 @@ export function buildTurns(
     if (!continues) {
       flush()
       startTs = m.ts
-      contextIn =
-        pendingContext && m.ts - pendingContextTs <= CONTEXT_MAX_AGE_SECONDS
-          ? pendingContext
-          : null
+
+      const fresh =
+        pending && m.ts - pending.ts <= CONTEXT_MAX_AGE_SECONDS ? pending : null
+      // An explicit quote beats the guess even when the guess is more recent.
+      context = quoted(m) ?? fresh
       // One incoming message is the context of one turn. Without this reset a
       // later, unrelated turn would inherit it and pollute the reply pairs.
-      pendingContext = null
+      pending = null
     }
 
     parts.push(cleaned)

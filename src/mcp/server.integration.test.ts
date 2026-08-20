@@ -89,8 +89,11 @@ describe('MCP server (end to end)', () => {
       })
     )
 
-    expect(text).toContain('Мне написали: Ты когда освободишься?')
+    expect(text).toContain('Ты когда освободишься?')
     expect(text).toContain('Через час.')
+    // The fixture pair is inferred from message order, not quoted, and the
+    // brief has to say so rather than presenting it as a real answer.
+    expect(text).toContain('Перед этим написали:')
   })
 
   it('check_as_me scores text and returns structured findings', async () => {
@@ -128,7 +131,11 @@ describe('MCP server (end to end)', () => {
   it('exposes the prompts', async () => {
     const client = await connect(cfg)
     const { prompts } = await client.listPrompts()
-    expect(prompts.map(p => p.name).sort()).toEqual(['as-me', 'reply-as-me'])
+    expect(prompts.map(p => p.name).sort()).toEqual([
+      'as-me',
+      'comment-as-me',
+      'reply-as-me',
+    ])
   })
 
   it('accepts every register the corpus can hold', async () => {

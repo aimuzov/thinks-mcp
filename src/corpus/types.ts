@@ -78,4 +78,8 @@ export interface Turn {
   chars: number
   /** The interlocutor message this turn answers, if any. */
   contextIn: string | null
+  /** True when the author quoted that message, false when we inferred it. */
+  contextExplicit: boolean
+  /** Seconds between the incoming message and this turn. */
+  contextLag: number | null
 }

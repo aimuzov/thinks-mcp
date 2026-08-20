@@ -85,6 +85,10 @@ It yields two registers: `code` for inline notes, `jsdoc` for docblocks. They
 are measured separately because they are different genres — an inline note is
 usually one line, a docblock opens with a summary and continues.
 
+A rebuild reuses the previous `git blame` results for files whose contents have
+not changed, keyed by blob hash — the difference between half a minute and a few
+seconds on a dozen repositories.
+
 Both corpora share one database without interfering: `build` rebuilds only the
 chat registers, `code` only the code ones.
 
@@ -151,7 +155,25 @@ limitation is real — it compares words, so a Russian comment over English
 identifiers cannot be judged and the check stays quiet.
 
 Resources: `style://profile` and `style://profile/{register}`, the profile as
-markdown. Prompts: `as-me` and `reply-as-me`.
+markdown. Prompts: `as-me`, `reply-as-me` and `comment-as-me`.
+
+## How much a reply example is worth
+
+`reply_as_me` builds its examples from pairs, and pairs come in two kinds.
+
+A message carrying `reply_to_message_id` is a fact: the author picked what they
+were answering. Everything else is inferred from message order — "whatever was
+said last". That guess fails where chat is most ordinary: someone writes
+"Sorry", the answer is about something else entirely, and the pair teaches a
+model to reply off-topic.
+
+So quoted pairs rank above inferred ones, and an inferred pair that took the
+author more than half an hour to send ranks lower still. Every example says
+which kind it is.
+
+Some registers have almost no pairs — a Telegram export of a supergroup carries
+hardly any of the other participants' messages. There the brief says so
+outright, rather than passing topical matches off as answers.
 
 The loop those prompts set up: get a brief → write → `check_as_me` → rewrite
 against the findings until the score is high.

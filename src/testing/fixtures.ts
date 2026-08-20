@@ -11,6 +11,7 @@ interface FixtureMessage {
   text_entities: { type: string; text: string }[]
   forwarded_from?: string
   via_bot?: string
+  reply_to_message_id?: number
 }
 
 let nextId = 1
@@ -86,6 +87,13 @@ export function makeDump() {
               { type: 'plain', text: 'Смотри ' },
               { type: 'text_link', text: 'вот сюда' },
             ]),
+            // An explicit quote: the owner answers the older of two incoming
+            // messages, so the pair must come from reply_to, not from order.
+            msg(FRIEND, t + 11000, plain('А что с доставкой?')),
+            msg(FRIEND, t + 11500, plain('И ещё, ты не забыл про ключи?')),
+            msg(OWNER, t + 11600, plain('Да, там же.'), {
+              reply_to_message_id: 12,
+            }),
           ],
         },
         {

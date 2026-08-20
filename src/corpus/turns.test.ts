@@ -48,6 +48,20 @@ describe('buildTurns', () => {
     expect(burst?.contextIn).toBe('Ты когда освободишься?')
   })
 
+  it('prefers the quoted message over the previous one', () => {
+    const { turns } = build()
+    const quoted = turns.find(t => t.parts[0] === 'Да, там же.')
+    expect(quoted?.contextIn).toBe('А что с доставкой?')
+    expect(quoted?.contextExplicit).toBe(true)
+  })
+
+  it('marks an inferred pair as inferred and records the lag', () => {
+    const { turns } = build()
+    const burst = turns.find(t => t.parts[0] === 'Через час.')
+    expect(burst?.contextExplicit).toBe(false)
+    expect(burst?.contextLag).toBe(10)
+  })
+
   it('does not reuse one incoming message for two turns', () => {
     const { turns } = build()
     const later = turns.find(t => t.parts[0] === 'Вышел.')

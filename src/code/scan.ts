@@ -37,6 +37,8 @@ export interface ScanStats {
   skippedOther: number
   /** Section rules, commented-out code — anything that is not prose. */
   skippedNoise: number
+  /** Files whose blame was reused from the previous build. */
+  filesCached: number
 }
 
 const DEFAULT_MAX_FILE_BYTES = 400_000
@@ -147,30 +149,78 @@ function readSource(repo: string, path: string): string | null {
   }
 }
 
+/**
+ * Blob hashes of every tracked file, in one call.
+ *
+ * `git blame` is the expensive part of a scan — a minute and a half across a
+ * dozen repositories — and almost all of that work repeats verbatim on the next
+ * build. A file's blob hash changes exactly when its contents change, so it is
+ * the right key for skipping the blame of a file nothing has touched.
+ */
+function blobHashes(repo: string): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const line of git(repo, ['ls-files', '-s']).split('\n')) {
+    // "100644 <sha> 0\t<path>"
+    const [meta, path] = line.split('\t')
+    if (!path) continue
+    const sha = meta.split(' ')[1]
+    if (sha) out.set(path, sha)
+  }
+  return out
+}
+
+/** Comments of one file, as cached between builds. */
+export interface CachedFile {
+  blob: string
+  comments: CodeComment[]
+}
+
+export interface ScanCache {
+  get(repo: string, path: string): CachedFile | undefined
+  set(repo: string, path: string, entry: CachedFile): void
+}
+
 /** Collect the owner's comments from one repository. */
 export function scanRepo(
   repo: string,
   opts: ScanOptions,
-  stats: ScanStats
+  stats: ScanStats,
+  cache?: ScanCache
 ): CodeComment[] {
   const emails = new Set(opts.emails.map(e => e.toLowerCase()))
   const maxBytes = opts.maxFileBytes ?? DEFAULT_MAX_FILE_BYTES
   const name = basename(repo)
   const out: CodeComment[] = []
+  const blobs = cache ? blobHashes(repo) : null
 
   for (const path of candidateFiles(repo, opts.emails)) {
     stats.filesConsidered++
     const syntax = syntaxFor(path)
     if (!syntax) continue
 
+    const blob = blobs?.get(path)
+    if (cache && blob) {
+      const hit = cache.get(name, path)
+      if (hit?.blob === blob) {
+        stats.filesCached++
+        stats.kept += hit.comments.length
+        out.push(...hit.comments)
+        continue
+      }
+    }
+
     const source = readSource(repo, path)
     if (source == null || source.length > maxBytes) continue
 
     const blocks = extractBlocks(source, syntax)
-    if (!blocks.length) continue
+    if (!blocks.length) {
+      if (cache && blob) cache.set(name, path, { blob, comments: [] })
+      continue
+    }
 
     stats.filesBlamed++
     const blamed = blame(repo, path)
+    const fresh: CodeComment[] = []
 
     for (const block of blocks) {
       stats.blocks++
@@ -186,7 +236,7 @@ export function scanRepo(
         continue
       }
       stats.kept++
-      out.push({
+      fresh.push({
         repo: name,
         lines: block.lines,
         text: blockText(block),
@@ -196,6 +246,9 @@ export function scanRepo(
         code: block.code,
       })
     }
+
+    out.push(...fresh)
+    if (cache && blob) cache.set(name, path, { blob, comments: fresh })
   }
 
   return out
@@ -205,6 +258,7 @@ export function scanRepo(
  * A block counts as prose only if it has words rather than punctuation and
  * syntax. Filters out section rules and code that was commented out.
  */
+
 /**
  * Machine directives addressed to a tool, not to a reader. They look like
  * comments and read like restated code, which is exactly how they turned up
@@ -234,6 +288,7 @@ export function emptyScanStats(): ScanStats {
     kept: 0,
     skippedOther: 0,
     skippedNoise: 0,
+    filesCached: 0,
   }
 }
 

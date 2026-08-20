@@ -4,6 +4,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { emptyScanStats, isRepo, scanRepo, type CodeComment } from './scan.js'
+import { BlameCache } from './cache.js'
+import { openDb } from '../store/db.js'
 
 const ME = 'me@example.com'
 const OTHER = 'other@example.com'
@@ -114,6 +116,58 @@ describe('scanRepo', () => {
     const texts = found.map(c => c.text)
     expect(texts.some(t => /^-+$/.test(t))).toBe(false)
     expect(texts.some(t => t.includes('oldCall('))).toBe(false)
+  })
+})
+
+describe('blame cache', () => {
+  it('returns the same comments without blaming again', () => {
+    const db = openDb(':memory:')
+    const cache = new BlameCache(db)
+
+    const first = emptyScanStats()
+    const cold = scanRepo(repo, { emails: [ME] }, first, cache)
+    expect(first.filesBlamed).toBeGreaterThan(0)
+    expect(first.filesCached).toBe(0)
+
+    const second = emptyScanStats()
+    const warm = scanRepo(repo, { emails: [ME] }, second, cache)
+    expect(second.filesBlamed).toBe(0)
+    expect(second.filesCached).toBe(first.filesBlamed)
+    expect(warm.map(c => c.text)).toEqual(cold.map(c => c.text))
+  })
+
+  it('survives a round trip through the database', () => {
+    const db = openDb(':memory:')
+    const writer = new BlameCache(db)
+    scanRepo(repo, { emails: [ME] }, emptyScanStats(), writer)
+    writer.flush()
+
+    // A fresh instance reads what the previous build wrote.
+    const reader = new BlameCache(db)
+    expect(reader.size).toBe(writer.size)
+
+    const stats = emptyScanStats()
+    scanRepo(repo, { emails: [ME] }, stats, reader)
+    expect(stats.filesBlamed).toBe(0)
+    expect(stats.filesCached).toBeGreaterThan(0)
+  })
+
+  it('re-blames a file after its contents change', () => {
+    const db = openDb(':memory:')
+    const cache = new BlameCache(db)
+    scanRepo(repo, { emails: [ME] }, emptyScanStats(), cache)
+
+    writeFileSync(
+      join(repo, 'mine.ts'),
+      ['// Совсем новый комментарий.', 'const a = 1'].join('\n')
+    )
+    run(repo, ['add', '.'])
+    run(repo, ['commit', '-qm', 'change'], ME)
+
+    const stats = emptyScanStats()
+    const found = scanRepo(repo, { emails: [ME] }, stats, cache)
+    expect(stats.filesBlamed).toBe(1)
+    expect(found.map(c => c.text)).toContain('Совсем новый комментарий.')
   })
 })
 

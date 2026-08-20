@@ -15,6 +15,7 @@ import {
   loadProfile,
 } from '../style/profile.js'
 import { pseudonym } from '../corpus/parse.js'
+import { BlameCache } from './cache.js'
 import { emptyScanStats, isRepo, scanRepo, type CodeComment } from './scan.js'
 
 export interface CodeBuildReport {
@@ -26,6 +27,7 @@ export interface CodeBuildReport {
   skippedOther: number
   skippedNoise: number
   filesBlamed: number
+  filesCached: number
 }
 
 /** Registers this command owns; nothing else in the database is touched. */
@@ -48,18 +50,21 @@ export function buildCodeCorpus(
   const stats = emptyScanStats()
   const comments: CodeComment[] = []
 
+  const db = openDb(cfg.dbPath)
+  const cache = new BlameCache(db)
+
   for (const repo of repos) {
     if (!isRepo(repo)) {
       log(`Пропускаю (не git-репозиторий): ${repo}`)
       continue
     }
     stats.repos++
-    const found = scanRepo(repo, { emails }, stats)
+    const found = scanRepo(repo, { emails }, stats, cache)
     log(`${repo}: ${found.length}`)
     comments.push(...found)
   }
 
-  const db = openDb(cfg.dbPath)
+  cache.flush()
   resetRegisters(db, OWNED)
 
   const insert = db.prepare(
@@ -129,6 +134,7 @@ export function buildCodeCorpus(
     skippedOther: stats.skippedOther,
     skippedNoise: stats.skippedNoise,
     filesBlamed: stats.filesBlamed,
+    filesCached: stats.filesCached,
   }
 
   // Loading it back is the cheapest proof that both halves still coexist.
@@ -147,6 +153,7 @@ export function formatCodeReport(r: CodeBuildReport): string {
     `  JSDoc:               ${n(r.doc)}`,
     `По-русски:             ${Math.round(r.russian * 100)}%`,
     `Файлов проверено:      ${n(r.filesBlamed)}`,
+    `Взято из кеша:         ${n(r.filesCached)}`,
     `Отсеяно чужих блоков:  ${n(r.skippedOther)}`,
     `Отсеяно не-прозы:      ${n(r.skippedNoise)}`,
     '',
