@@ -22,6 +22,8 @@ versions follow [SemVer](https://semver.org/).
 - The one English error message ("Could not determine the owner id") is in
   Russian like the rest and points at `THINKS_OWNER_ID`.
 - `thinks-mcp --help` prints usage to stdout and exits 0.
+- `bin` is declared without the `./` prefix: npm 11.19 drops such an entry
+  at publish time, which would have shipped the package with no binary.
 
 ### Changed
 

@@ -34,7 +34,7 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "thinks-mcp": "./build/index.js"
+    "thinks-mcp": "build/index.js"
   },
   "files": [
     "build",
