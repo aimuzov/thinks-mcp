@@ -27,6 +27,9 @@ versions follow [SemVer](https://semver.org/).
 
 ### Changed
 
+- Published as `@aimuzov/thinks-mcp`. The unscoped `thinks-mcp` stays at 0.1.0
+  and is deprecated in favour of the scoped name; the binary is still
+  `thinks-mcp`.
 - The tarball no longer ships source maps that pointed at files outside the
   package.
 - Usage text lists `THINKS_RECENT_YEARS` and `XDG_CONFIG_HOME`.

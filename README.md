@@ -37,13 +37,13 @@ FTS5, which is stable from that version on.
 ### Through mise
 
 ```bash
-mise use -g npm:thinks-mcp
+mise use -g npm:@aimuzov/thinks-mcp
 ```
 
 ### From source
 
 ```bash
-pnpm i && pnpm build && npm pack && npm i -g ./thinks-mcp-*.tgz
+pnpm i && pnpm build && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
 ```
 
 Note that `npm i -g` installs the binary into whichever Node version is active
@@ -110,7 +110,7 @@ Copy `.mcp.json.example` to `.mcp.json`:
   "mcpServers": {
     "thinks": {
       "command": "/opt/homebrew/bin/mise",
-      "args": ["exec", "npm:thinks-mcp", "--", "thinks-mcp"]
+      "args": ["exec", "npm:@aimuzov/thinks-mcp", "--", "thinks-mcp"]
     }
   }
 }

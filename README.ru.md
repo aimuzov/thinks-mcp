@@ -37,13 +37,13 @@ MCP-сервер, который пишет, отвечает и перефор�
 ### Через mise
 
 ```bash
-mise use -g npm:thinks-mcp
+mise use -g npm:@aimuzov/thinks-mcp
 ```
 
 ### Локально, из исходников
 
 ```bash
-pnpm i && pnpm build && npm pack && npm i -g ./thinks-mcp-*.tgz
+pnpm i && pnpm build && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
 ```
 
 Учти: `npm i -g` ставит бинарник в ту версию Node, которая активна в этот
@@ -110,7 +110,7 @@ THINKS_CODE_EMAILS="me@personal,me@work" thinks-mcp code ~/Projects/*/ ~/work/re
   "mcpServers": {
     "thinks": {
       "command": "/opt/homebrew/bin/mise",
-      "args": ["exec", "npm:thinks-mcp", "--", "thinks-mcp"]
+      "args": ["exec", "npm:@aimuzov/thinks-mcp", "--", "thinks-mcp"]
     }
   }
 }
