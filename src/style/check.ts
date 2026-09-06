@@ -1,5 +1,6 @@
 import { isCodeRegister, type Register } from '../corpus/types.js'
-import { word } from './antipatterns.js'
+import { listShare, markdownShare, RARE_SHARE, word } from './antipatterns.js'
+import { splitMarkers } from './codeMetrics.js'
 import { metricsFor, type StyleProfile } from './profile.js'
 
 export interface Finding {
@@ -159,18 +160,29 @@ export function checkText(
     })
   }
 
-  // Formatting the archive essentially never uses.
-  if (/^\s*([-–—•*]|\d[.)])\s+\S/m.test(whole)) {
+  // Formatting is held against the text only when the archive was measured
+  // and really does without it.
+  const lists = listShare(profile.antiPatterns)
+  if (
+    lists !== undefined &&
+    lists < RARE_SHARE &&
+    /^\s*([-–—•*]|\d[.)])\s+\S/m.test(whole)
+  ) {
     findings.push({
       issue: 'Список — я так не пишу',
-      detail: 'списки встречаются в 0.05–0.1% моих сообщений',
+      detail: `списки встречаются в ${lists}% моих сообщений`,
       penalty: 15,
     })
   }
-  if (/\*\*|__/.test(whole)) {
+  const markdown = markdownShare(profile.antiPatterns)
+  if (
+    markdown !== undefined &&
+    markdown < RARE_SHARE &&
+    /\*\*|__/.test(whole)
+  ) {
     findings.push({
       issue: 'Markdown-разметка',
-      detail: 'в архиве её доля 0.005%',
+      detail: `в архиве её доля ${markdown}%`,
       penalty: 12,
     })
   }
@@ -198,10 +210,6 @@ export function checkText(
     findings: findings.sort((a, b) => b.penalty - a.penalty),
   }
 }
-
-/** Markers the author uses, and the ones they replaced long ago. */
-const OWN_MARKERS = ['TODO', 'HACK', 'NOTE', 'REVIEW']
-const FOREIGN_MARKERS = ['FIXME', 'XXX', 'WARN', 'IMPORTANT']
 
 /**
  * Words a comment and its code share, as a fraction of the comment's own words.
@@ -308,12 +316,14 @@ function checkComment(
     })
   }
 
-  for (const marker of FOREIGN_MARKERS) {
+  // No markers in the corpus means nothing to hold the text against.
+  const { own, foreign } = splitMarkers(codeStats)
+  for (const marker of own.length ? foreign : []) {
     if (new RegExp(`\\b${marker}\\b`).test(whole)) {
       findings.push({
         issue: 'Чужой маркер',
         fragment: marker,
-        detail: `я использую только ${OWN_MARKERS.join(', ')}`,
+        detail: `я использую только ${own.join(', ')}`,
         penalty: 12,
       })
     }

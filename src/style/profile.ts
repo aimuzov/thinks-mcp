@@ -2,7 +2,12 @@ import type { Db } from '../store/db.js'
 import { isCodeRegister, type Register } from '../corpus/types.js'
 import { measure, type RegisterMetrics } from './metrics.js'
 import type { Marker } from './lexicon.js'
-import type { AntiPattern } from './antipatterns.js'
+import {
+  listShare,
+  markdownShare,
+  RARE_SHARE,
+  type AntiPattern,
+} from './antipatterns.js'
 import type { CodeMetrics } from './codeMetrics.js'
 import { codeConstraints, renderCodeProfile } from './codeProfile.js'
 import { allTurns } from '../search/query.js'
@@ -254,7 +259,9 @@ export function renderProfile(
     lines.push('')
   }
 
-  const rare = profile.antiPatterns.filter(a => a.share < 0.2).slice(0, 10)
+  const rare = profile.antiPatterns
+    .filter(a => a.share < RARE_SHARE)
+    .slice(0, 10)
   if (rare.length) {
     lines.push('## Чего я не делаю')
     lines.push('- Практически не встречается в архиве (доля сообщений):')
@@ -310,9 +317,16 @@ export function constraintsOf(
         .join(' ')}. ` + 'Чаще всего их нет вовсе.'
     )
   }
-  out.push(
-    'Без списков, буллетов и markdown-разметки — в архиве их доля меньше 0.2%.'
-  )
+  const lists = listShare(profile.antiPatterns)
+  const markdown = markdownShare(profile.antiPatterns)
+  if (lists !== undefined && markdown !== undefined) {
+    const share = Math.max(lists, markdown)
+    if (share < RARE_SHARE) {
+      out.push(
+        `Без списков, буллетов и markdown-разметки — в архиве их доля не больше ${share}%.`
+      )
+    }
+  }
 
   // Blind testing against held-out pairs showed the gap: a model reproduces the
   // shape (length, periods, several short messages) but smooths the vocabulary

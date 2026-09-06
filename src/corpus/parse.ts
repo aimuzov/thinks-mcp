@@ -72,7 +72,12 @@ export function resolveOwnerId(dump: RawDump): string {
       bestCount = count
     }
   }
-  if (!best) throw new Error('Could not determine the owner id from the dump.')
+  if (!best) {
+    throw new Error(
+      'Не удалось определить владельца выгрузки: ни у одного сообщения нет ' +
+        'from_id. Задай THINKS_OWNER_ID.'
+    )
+  }
   return best
 }
 

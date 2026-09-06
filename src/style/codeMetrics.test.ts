@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { measureCode, type CodeBlockInput } from './codeMetrics.js'
+import {
+  measureCode,
+  splitMarkers,
+  type CodeBlockInput,
+} from './codeMetrics.js'
 
 const block = (
   lines: string[],
@@ -48,6 +52,22 @@ describe('measureCode', () => {
     expect(byName.TODO).toBe(1)
     expect(byName.NOTE).toBe(1)
     expect(byName.FIXME).toBe(1)
+  })
+
+  it("treats a marker seen a couple of times as somebody else's", () => {
+    const m = measureCode([
+      ...Array.from({ length: 40 }, () => block(['TODO: Доделать.'])),
+      ...Array.from({ length: 6 }, () => block(['NOTE: Неочевидно.'])),
+      block(['FIXME: чужой маркер']),
+    ])
+    const { own, foreign } = splitMarkers(m)
+    expect(own).toEqual(['TODO', 'NOTE'])
+    expect(foreign).toContain('FIXME')
+    expect(foreign).toContain('IMPORTANT')
+  })
+
+  it('claims no markers for a corpus without any', () => {
+    expect(splitMarkers(measureCode([block(['Просто факт.'])])).own).toEqual([])
   })
 
   it('reports the language split and the repositories', () => {

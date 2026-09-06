@@ -9,7 +9,7 @@ description = "Собрать корпус из выгрузки Telegram: mise 
 run = "node --max-old-space-size=8192 build/index.js build"
 
 [tasks.profile]
-description = "Напечатать стиль-профиль (dm | group | longform)"
+description = "Напечатать стиль-профиль (dm | group | longform | code | jsdoc)"
 run = "node build/index.js profile"
 
 [tasks.where]

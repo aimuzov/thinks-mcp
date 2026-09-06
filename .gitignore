@@ -16,3 +16,6 @@ dump.json
 
 # Machine-specific MCP host config (absolute paths)
 .mcp.json
+
+# Serena (LSP assistant) project cache
+.serena/

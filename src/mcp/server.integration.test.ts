@@ -25,6 +25,8 @@ function seededConfig(): Config {
     burstWindowSeconds: 90,
     longformMinChars: 300,
     holdoutSize: 0,
+    codeEmails: [],
+    recentYears: 3,
   }
   buildCorpus(cfg)
   return cfg
@@ -43,6 +45,10 @@ const textOf = (result: unknown): string =>
     .filter(c => c.type === 'text')
     .map(c => c.text)
     .join('\n')
+
+// A resource may carry a blob instead of text; the profile is always text.
+const textOfResource = (c: { text?: string; blob?: string }): string =>
+  String(c.text ?? '')
 
 let cfg: Config
 
@@ -104,7 +110,9 @@ describe('MCP server (end to end)', () => {
     })
 
     const report = (
-      result as { structuredContent: { score: number; findings: unknown[] } }
+      result as unknown as {
+        structuredContent: { score: number; findings: unknown[] }
+      }
     ).structuredContent
     expect(report.score).toBeLessThan(80)
     expect(report.findings.length).toBeGreaterThan(0)
@@ -125,7 +133,7 @@ describe('MCP server (end to end)', () => {
   it('serves the style profile as a resource', async () => {
     const client = await connect(cfg)
     const { contents } = await client.readResource({ uri: 'style://profile' })
-    expect(String(contents[0].text)).toContain('Как я пишу')
+    expect(textOfResource(contents[0])).toContain('Как я пишу')
   })
 
   it('exposes the prompts', async () => {
@@ -173,7 +181,7 @@ describe('MCP server (end to end)', () => {
     expect(textOf(result)).toContain('thinks-mcp build')
 
     const { contents } = await client.readResource({ uri: 'style://profile' })
-    expect(String(contents[0].text)).toContain('thinks-mcp build')
+    expect(textOfResource(contents[0])).toContain('thinks-mcp build')
   })
 
   it('picks up a corpus built after startup, without a restart', async () => {

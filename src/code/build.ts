@@ -139,7 +139,12 @@ export function buildCodeCorpus(
 
   // Loading it back is the cheapest proof that both halves still coexist.
   const merged = loadProfile(db)
-  if (!merged?.code) throw new Error('Профиль кода не сохранился.')
+  if (!merged?.code) {
+    throw new Error(
+      `Профиль кода не сохранился: в ${cfg.dbPath} после записи нет части ` +
+        '`code`. Пересобери: `thinks-mcp code <пути к репозиториям>`.'
+    )
+  }
 
   db.close()
   return report

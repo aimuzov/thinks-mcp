@@ -1,4 +1,4 @@
-import type { CodeMetrics } from './codeMetrics.js'
+import { splitMarkers, type CodeMetrics } from './codeMetrics.js'
 
 const pct = (share: number) => `${Math.round(share * 1000) / 10}%`
 
@@ -62,25 +62,20 @@ export function renderCodeProfile(
     lines.push('')
   }
 
-  const used = code.markers.filter(m =>
-    ['TODO', 'HACK', 'NOTE', 'REVIEW'].includes(m.name)
-  )
-  const foreign = code.markers.filter(m =>
-    ['FIXME', 'XXX', 'WARN'].includes(m.name)
-  )
-  if (used.length || foreign.length) {
+  const { own, foreign } = splitMarkers(code)
+  if (own.length) {
+    const used = code.markers
+      .filter(m => own.includes(m.name))
+      .map(m => `${m.name} (${m.count})`)
+    const stray = code.markers
+      .filter(m => !own.includes(m.name))
+      .map(m => `${m.name} — ${m.count}`)
     lines.push('## Маркеры')
-    if (used.length) {
-      lines.push(
-        `- Пользуюсь только этими: ${used.map(m => `${m.name} (${m.count})`).join(', ')}.`
-      )
-    }
+    lines.push(`- Пользуюсь только этими: ${used.join(', ')}.`)
     lines.push(
-      foreign.length
-        ? `- FIXME/XXX/WARN почти не встречаются: ${foreign
-            .map(m => `${m.name} — ${m.count}`)
-            .join(', ')}.`
-        : '- FIXME, XXX и WARN не использую вовсе.'
+      stray.length
+        ? `- Остальные почти не встречаются: ${stray.join(', ')}.`
+        : `- ${foreign.join(', ')} не использую вовсе.`
     )
     lines.push('')
   }
@@ -121,9 +116,14 @@ export function codeConstraints(
     )
   } else {
     out.push(
-      'Полное предложение — с точкой. Короткий ярлык над блоком — без точки.',
-      'Маркеры только эти четыре: TODO, HACK, NOTE, REVIEW. Формат `// МАРКЕР: Текст.`'
+      'Полное предложение — с точкой. Короткий ярлык над блоком — без точки.'
     )
+    const { own } = splitMarkers(code)
+    if (own.length) {
+      out.push(
+        `Маркеры только эти: ${own.join(', ')}. Формат \`// МАРКЕР: Текст.\``
+      )
+    }
   }
 
   out.push(

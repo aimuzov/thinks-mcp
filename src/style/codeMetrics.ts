@@ -51,8 +51,37 @@ export interface CodeBlockInput {
   lang: 'ru' | 'en'
 }
 
-/** The four the author actually uses; anything else is someone else's habit. */
-const MARKERS = ['TODO', 'HACK', 'NOTE', 'REVIEW', 'FIXME', 'XXX', 'WARN']
+/**
+ * Marker vocabulary counted per block. Which ones are the author's own is
+ * decided by `splitMarkers`.
+ */
+export const MARKERS = [
+  'TODO',
+  'HACK',
+  'NOTE',
+  'REVIEW',
+  'FIXME',
+  'XXX',
+  'WARN',
+  'IMPORTANT',
+]
+
+/**
+ * Markers the author relies on, against the rest of the vocabulary.
+ *
+ * A marker seen once or twice next to hundreds of another is not a habit — a
+ * stray FIXME survives merges — so anything under a tenth of the most used one
+ * counts as foreign too.
+ */
+export function splitMarkers(code: CodeMetrics): {
+  own: string[]
+  foreign: string[]
+} {
+  const top = code.markers[0]?.count ?? 0
+  const own = code.markers.filter(m => m.count >= top / 10).map(m => m.name)
+  const foreign = MARKERS.filter(name => !own.includes(name))
+  return { own, foreign }
+}
 
 /**
  * Phrases that carry a reason. Their frequency is the closest measurable proxy

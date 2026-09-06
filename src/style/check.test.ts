@@ -57,7 +57,11 @@ const profile: StyleProfile = {
   recent: {},
   recentFrom: 0,
   markers: [],
-  antiPatterns: [],
+  antiPatterns: [
+    { label: 'списки через дефис', hits: 80, share: 0.05 },
+    { label: 'нумерованные списки', hits: 30, share: 0.019 },
+    { label: 'markdown-жирный **', hits: 8, share: 0.005 },
+  ],
 }
 
 const check = (text: string) => checkText(text, profile)
@@ -82,6 +86,22 @@ describe('checkText', () => {
     const found = issues('Смотри:\n- первое\n- второе\nи **важное**')
     expect(found).toContain('Список — я так не пишу')
     expect(found).toContain('Markdown-разметка')
+  })
+
+  it('lets lists through for an author who writes them', () => {
+    const listy: StyleProfile = {
+      ...profile,
+      antiPatterns: [{ label: 'списки через дефис', hits: 5000, share: 3.1 }],
+    }
+    const found = checkText('Смотри:\n- первое\n- второе', listy).findings
+    expect(found.map(f => f.issue)).not.toContain('Список — я так не пишу')
+  })
+
+  it('does not assert formatting habits that were never measured', () => {
+    const unmeasured: StyleProfile = { ...profile, antiPatterns: [] }
+    const found = checkText('- первое\n**второе**', unmeasured).findings
+    expect(found.map(f => f.issue)).not.toContain('Список — я так не пишу')
+    expect(found.map(f => f.issue)).not.toContain('Markdown-разметка')
   })
 
   it('flags clerical language with the offending fragment', () => {
@@ -143,7 +163,11 @@ const withCode: StyleProfile = {
     inline: 60,
     doc: 40,
     russian: 0.77,
-    markers: [],
+    markers: [
+      { name: 'TODO', count: 30, share: 0.3 },
+      { name: 'NOTE', count: 5, share: 0.05 },
+      { name: 'FIXME', count: 1, share: 0.01 },
+    ],
     connectives: [],
     repos: [],
   },
@@ -168,10 +192,24 @@ describe('checkText for comments', () => {
     ).toContain('Строка шире, чем я обычно пишу')
   })
 
-  it('flags markers the author replaced long ago', () => {
+  it('flags markers the corpus does not rely on', () => {
     const found = checkCode('// FIXME: почини').findings
     expect(found.map(f => f.issue)).toContain('Чужой маркер')
+    expect(found[0].detail).toBe('я использую только TODO, NOTE')
+    expect(checkCode('// XXX: почини').findings.map(f => f.issue)).toContain(
+      'Чужой маркер'
+    )
     expect(checkCode('// TODO: доделать').findings).toEqual([])
+  })
+
+  it('stays quiet about markers when the corpus has none', () => {
+    const noMarkers: StyleProfile = {
+      ...withCode,
+      code: { ...withCode.code!, markers: [] },
+    }
+    expect(checkText('// FIXME: почини', noMarkers, 'code').findings).toEqual(
+      []
+    )
   })
 
   it('flags водянистые announcements', () => {

@@ -14,13 +14,14 @@ function turn(partial: Partial<Turn> & { text: string }): Turn {
     longform: text.length >= 300,
     ts: 1_700_000_000,
     year: 2023,
-    parts,
-    text,
     chars: text.length,
     contextIn: null,
+    contextExplicit: false,
+    contextLag: null,
     ...partial,
     // keep text and parts consistent even when the caller overrode one
-    ...(partial.parts ? { text } : {}),
+    parts,
+    text,
   }
 }
 

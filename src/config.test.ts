@@ -43,4 +43,28 @@ describe('loadConfig', () => {
     expect(cfg.longformMinChars).toBe(300)
     expect(cfg.chatStopList).toEqual(['Чат один', 'Чат два'])
   })
+
+  it('parses the recency window and the git identity', () => {
+    const cfg = loadConfig({
+      THINKS_RECENT_YEARS: '5',
+      THINKS_CODE_EMAILS: 'me@personal, me@work,',
+    })
+    expect(cfg.recentYears).toBe(5)
+    expect(cfg.codeEmails).toEqual(['me@personal', 'me@work'])
+  })
+
+  it('falls back to three recent years and no emails', () => {
+    const cfg = loadConfig({ THINKS_RECENT_YEARS: 'abc' })
+    expect(cfg.recentYears).toBe(3)
+    expect(cfg.codeEmails).toEqual([])
+  })
+
+  it('takes the dump path and the owner id verbatim', () => {
+    const cfg = loadConfig({
+      THINKS_DUMP: '/mnt/export/result.json',
+      THINKS_OWNER_ID: ' user42 ',
+    })
+    expect(cfg.dumpPath).toBe('/mnt/export/result.json')
+    expect(cfg.ownerId).toBe('user42')
+  })
 })

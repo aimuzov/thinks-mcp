@@ -1,6 +1,6 @@
 {
   "name": "thinks-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server that writes, replies and rephrases in your own voice, learned from a Telegram export. Hands the calling model a measured style profile and your real messages — no API keys, no generation of its own.",
   "keywords": [
     "mcp",
@@ -40,6 +40,7 @@
     "build",
     "README.md",
     "README.ru.md",
+    "CHANGELOG.md",
     "LICENSE",
     ".mcp.json.example"
   ],
@@ -55,7 +56,7 @@
     "where": "node build/index.js where",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
     "prepublishOnly": "npm run typecheck && npm run format:check && npm run test && npm run build"

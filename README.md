@@ -10,6 +10,11 @@ a **brief**: a measured style profile, real messages of yours picked for the
 request, numeric constraints and an output contract. The model writes — Claude
 Code, Claude Desktop, whatever you use.
 
+The server speaks Russian: tool descriptions, briefs, the profile and the CLI
+are all in Russian, and the style probes — clerical phrases, stop words,
+redaction placeholders — assume a Russian-language archive. English is handled
+in search and in the code registers, where both languages occur.
+
 ## How it works
 
 Two phases with a SQLite file between them.
@@ -38,7 +43,7 @@ mise use -g npm:thinks-mcp
 ### From source
 
 ```bash
-pnpm i && pnpm build && npm pack && npm i -g ./thinks-mcp-0.1.0.tgz
+pnpm i && pnpm build && npm pack && npm i -g ./thinks-mcp-*.tgz
 ```
 
 Note that `npm i -g` installs the binary into whichever Node version is active
@@ -111,7 +116,8 @@ Copy `.mcp.json.example` to `.mcp.json`:
 }
 ```
 
-While the package is unpublished, run a locally installed binary instead:
+Installed from source with `npm i -g`, launch through the Node version the
+binary landed in:
 
 ```json
 {
@@ -147,7 +153,18 @@ For comments in code use only `code` and `jsdoc`. The chat registers are
 measured on conversation — short replies, colloquial forms, emoji — and in code
 they produce somebody else's voice.
 
-There is also `lang` (`ru`/`en`), meaningful for code, where both are used.
+`write_as_me` and `find_my_messages` also take `lang` (`ru`/`en`), meaningful
+for code, where both are used.
+
+The rest of the parameters:
+
+- `examples` (4–40, default 18) on the three brief tools — how many archive
+  examples go into the brief;
+- `length` (`short`/`normal`/`long`) on `write_as_me`, relative to what is
+  usual for the register;
+- `hint` on `reply_as_me` — what the answer should say;
+- `limit`, `yearFrom` and `matchIncoming` on `find_my_messages`; the last one
+  searches the interlocutors' messages instead of yours.
 
 `check_as_me` takes an optional `code` argument: the lines the comment sits
 above. With it the check also catches comments that restate the code. Its
@@ -156,6 +173,9 @@ identifiers cannot be judged and the check stays quiet.
 
 Resources: `style://profile` and `style://profile/{register}`, the profile as
 markdown. Prompts: `as-me`, `reply-as-me` and `comment-as-me`.
+
+The loop those prompts set up: get a brief → write → `check_as_me` → rewrite
+against the findings until the score is high.
 
 ## How much a reply example is worth
 
@@ -174,9 +194,6 @@ which kind it is.
 Some registers have almost no pairs — a Telegram export of a supergroup carries
 hardly any of the other participants' messages. There the brief says so
 outright, rather than passing topical matches off as answers.
-
-The loop those prompts set up: get a brief → write → `check_as_me` → rewrite
-against the findings until the score is high.
 
 ## Recency
 
@@ -218,6 +235,7 @@ thinks-mcp profile jsdoc        # print the profile for a register
 thinks-mcp where                # where the index lives
 thinks-mcp holdout --answers    # blind quality check
 thinks-mcp serve                # same as no arguments
+thinks-mcp --help
 ```
 
 In the repository itself:
@@ -237,12 +255,12 @@ said.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `THINKS_DATA_DIR` | `~/.config/thinks-mcp` | directory holding the index |
+| `THINKS_DATA_DIR` | `$XDG_CONFIG_HOME/thinks-mcp` or `~/.config/thinks-mcp` | directory holding the index |
 | `THINKS_DUMP` | `<data-dir>/dump.json` | export path, if not passed as an argument |
 | `THINKS_DB` | `<data-dir>/style.db` | index file path |
 | `THINKS_OWNER_ID` | auto-detected | set if detection picks the wrong person |
 | `THINKS_CHAT_STOPLIST` | empty | comma-separated chats to skip |
-| `THINKS_CODE_EMAILS` | `git config user.email` | comma-separated git author emails |
+| `THINKS_CODE_EMAILS` | `git config --global user.email` | comma-separated git author emails |
 | `THINKS_RECENT_YEARS` | `3` | window that counts as "how I write now" |
 | `THINKS_BURST_WINDOW` | `90` | burst window in seconds |
 | `THINKS_LONGFORM_MIN` | `300` | longform threshold in characters |

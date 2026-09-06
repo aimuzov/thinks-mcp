@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ensureDataDir, type Config } from '../config.js'
@@ -10,7 +11,10 @@ import { registerReplyAsMe } from './tools/replyAsMe.js'
 import { registerRephraseAsMe } from './tools/rephraseAsMe.js'
 import { registerWriteAsMe } from './tools/writeAsMe.js'
 
-const VERSION = '0.1.0'
+// Read at runtime so the MCP handshake can never report a stale version.
+const { version: VERSION } = createRequire(import.meta.url)(
+  '../../package.json'
+) as { version: string }
 
 /**
  * Build a fully-wired MCP server.

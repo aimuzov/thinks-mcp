@@ -11,13 +11,13 @@ import { openDb } from './store/db.js'
 import { loadProfile, renderProfile, REGISTERS } from './style/profile.js'
 import type { Register } from './corpus/types.js'
 
-const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозитории...>|profile [register]|holdout|where]
+const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозитории...>|profile [register]|holdout|where|--help]
 
   serve             запустить MCP-сервер на stdio (по умолчанию)
   build <dump.json> собрать корпус и профиль из выгрузки Telegram
   code <пути...>    собрать корпус комментариев из git-репозиториев.
                     Авторство определяется по email — задай THINKS_CODE_EMAILS
-                    через запятую, иначе берётся git config user.email
+                    через запятую, иначе берётся git config --global user.email
   profile [reg]     напечатать стиль-профиль
                     (dm | group | longform | code | jsdoc)
   holdout [--answers]
@@ -27,12 +27,14 @@ const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозито
   where             показать, где лежат корпус и профиль
 
 Переменные окружения:
-  THINKS_DATA_DIR   каталог с индексом (по умолчанию ~/.config/thinks-mcp)
+  THINKS_DATA_DIR   каталог с индексом (по умолчанию $XDG_CONFIG_HOME/thinks-mcp
+                    или ~/.config/thinks-mcp)
   THINKS_DUMP       путь к выгрузке, если не передан аргументом
   THINKS_DB         путь к файлу индекса
   THINKS_OWNER_ID   id владельца, если автоопределение ошиблось
   THINKS_CHAT_STOPLIST  чаты через запятую, которые не попадут в корпус
   THINKS_CODE_EMAILS    git-адреса автора через запятую (личный и рабочий)
+  THINKS_RECENT_YEARS   сколько последних лет считать «как я пишу сейчас» (3)
   THINKS_BURST_WINDOW, THINKS_LONGFORM_MIN, THINKS_HOLDOUT`
 
 async function main() {
@@ -137,6 +139,11 @@ async function main() {
     case undefined:
     case 'serve':
       await serve(cfg)
+      return
+
+    case '--help':
+    case '-h':
+      console.log(USAGE)
       return
 
     default:

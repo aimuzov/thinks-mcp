@@ -37,6 +37,33 @@ const PROBES: { label: string; test: RegExp }[] = [
   { label: 'эмодзи 👍', test: /👍/u },
 ]
 
+/** Below this share of messages a habit counts as "not mine". Percent. */
+export const RARE_SHARE = 0.2
+
+const LIST_LABELS = ['списки через дефис', 'нумерованные списки', 'буллеты •']
+const MARKDOWN_LABELS = ['markdown-жирный **']
+
+/**
+ * Share of messages, in percent, carrying any of the given habits.
+ *
+ * Undefined when none of them was measured: a profile built before the probe
+ * existed must not be read as "never does this".
+ */
+function habitShare(
+  patterns: AntiPattern[],
+  labels: string[]
+): number | undefined {
+  const found = patterns.filter(a => labels.includes(a.label))
+  if (!found.length) return undefined
+  return Math.max(...found.map(a => a.share))
+}
+
+export const listShare = (patterns: AntiPattern[]) =>
+  habitShare(patterns, LIST_LABELS)
+
+export const markdownShare = (patterns: AntiPattern[]) =>
+  habitShare(patterns, MARKDOWN_LABELS)
+
 export function findAntiPatterns(turns: Turn[]): AntiPattern[] {
   const messages = turns.flatMap(t => t.parts)
   const total = messages.length || 1
