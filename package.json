@@ -1,6 +1,6 @@
 {
   "name": "@aimuzov/thinks-mcp",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "MCP server that writes, replies and rephrases in your own voice, learned from a Telegram export. Hands the calling model a measured style profile and your real messages — no API keys, no generation of its own.",
   "keywords": [
     "mcp",

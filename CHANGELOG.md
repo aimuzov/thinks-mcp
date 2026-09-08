@@ -5,6 +5,8 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-08
+
 ### Added
 
 - Typographic marks (`«»`, `—`, `–`, `“”`, `--`) are measured per register and
@@ -57,6 +59,7 @@ First release on npm: `build`, `code`, `profile`, `holdout`, `where` and the
 MCP server with `write_as_me`, `reply_as_me`, `rephrase_as_me`, `check_as_me`
 and `find_my_messages`.
 
-[Unreleased]: https://github.com/aimuzov/thinks-mcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/aimuzov/thinks-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aimuzov/thinks-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/aimuzov/thinks-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/aimuzov/thinks-mcp/releases/tag/v0.1.0
