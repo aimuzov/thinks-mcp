@@ -14,6 +14,7 @@ const block = (
   text: lines.join('\n'),
   isDoc: false,
   lang: 'ru',
+  year: 2020,
   ...extra,
 })
 
@@ -77,6 +78,31 @@ describe('measureCode', () => {
     ])
     expect(m.russian).toBe(0.5)
     expect(m.repos.map(r => r.repo).sort()).toEqual(['repo-a', 'repo-b'])
+  })
+
+  it('counts typography only over the handwritten years', () => {
+    const handwritten = Array.from({ length: 200 }, () =>
+      block(['Кеш живёт до перезапуска -- дольше не нужно.'], { year: 2023 })
+    )
+    const assisted = Array.from({ length: 400 }, () =>
+      block(['Кеш живёт до перезапуска — дольше не нужно.'], { year: 2026 })
+    )
+    const blocks = [...handwritten, ...assisted]
+
+    const dash = (m: ReturnType<typeof measureCode>) =>
+      m.typography?.code?.find(a => a.label === 'длинное тире —')?.share
+
+    expect(dash(measureCode(blocks))).toBeCloseTo(66.667)
+    expect(dash(measureCode(blocks, 2026))).toBe(0)
+  })
+
+  it('leaves a genre unmeasured when the window keeps too few lines', () => {
+    const blocks = [
+      block(['Ещё до всего.'], { year: 2023 }),
+      ...Array.from({ length: 300 }, () => block(['Свежее.'], { year: 2026 })),
+    ]
+    expect(measureCode(blocks, 2026).typography?.code).toBeUndefined()
+    expect(measureCode(blocks).typography?.code).toBeDefined()
   })
 
   it('survives an empty corpus', () => {

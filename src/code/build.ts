@@ -106,7 +106,8 @@ export function buildCodeCorpus(
   // Measured on pseudonymised names so no repository name reaches the profile,
   // which is a document the calling model reads.
   const code = measureCode(
-    comments.map(c => ({ ...c, repo: pseudonym('repo', c.repo) }))
+    comments.map(c => ({ ...c, repo: pseudonym('repo', c.repo) })),
+    cfg.codeHandwrittenUntil
   )
   const recentFrom = new Date().getUTCFullYear() - cfg.recentYears + 1
   saveCodeProfile(db, {

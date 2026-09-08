@@ -141,6 +141,51 @@ describe('checkText', () => {
   })
 })
 
+const typed = (shares: Record<string, number>): StyleProfile => ({
+  ...profile,
+  typography: Object.entries(shares).map(([label, share]) => ({
+    label,
+    hits: 1,
+    share,
+  })),
+})
+
+describe('checkText on typography', () => {
+  it('flags a mark the archive almost never carries', () => {
+    const found = checkText(
+      'Плов — пусть готовит.',
+      typed({ 'длинное тире —': 1.1 }),
+      'dm'
+    ).findings
+    expect(found.map(f => f.issue)).toContain('Знак не из моего набора')
+    expect(found[0].fragment).toBe('—')
+    expect(found[0].detail).toContain('1.1%')
+  })
+
+  it('lets a mark through for an author who types it', () => {
+    const found = checkText(
+      'Плов — пусть готовит.',
+      typed({ 'длинное тире —': 4.3 }),
+      'dm'
+    ).findings
+    expect(found.map(f => f.issue)).not.toContain('Знак не из моего набора')
+  })
+
+  it('says nothing about marks that were never measured', () => {
+    const found = checkText('Он сказал «нет» — и ушёл.', profile, 'dm').findings
+    expect(found.map(f => f.issue)).not.toContain('Знак не из моего набора')
+  })
+
+  it('never holds the double hyphen against a text', () => {
+    const found = checkText(
+      'Пишу так -- и всё.',
+      typed({ 'двойной дефис --': 0 }),
+      'dm'
+    ).findings
+    expect(found.map(f => f.issue)).not.toContain('Знак не из моего набора')
+  })
+})
+
 const withCode: StyleProfile = {
   ...profile,
   code: {
@@ -302,5 +347,29 @@ describe('checkText for comments', () => {
   it('says so when the code corpus has not been built', () => {
     const report = checkText('// Что угодно.', profile, 'code')
     expect(report.verdict).toBe('Корпус кода не собран.')
+  })
+
+  it('takes typography from the code corpus, not from the chat one', () => {
+    // The archive's messages hold no `«»` and its comments hold no dash: each
+    // register answers for itself, or the chat numbers would ban a dash the
+    // author does write in code.
+    const mixed: StyleProfile = {
+      ...withCode,
+      typography: [{ label: 'длинное тире —', hits: 1, share: 1.1 }],
+      code: {
+        ...withCode.code!,
+        typography: {
+          jsdoc: [
+            { label: 'кавычки-ёлочки «»', hits: 0, share: 0 },
+            { label: 'длинное тире —', hits: 300, share: 4.3 },
+          ],
+        },
+      },
+    }
+
+    const doc = ['/**', ' * Ставлю «ёлочки» — и тире.', ' */'].join('\n')
+    const found = checkText(doc, mixed, 'jsdoc').findings
+    const marks = found.filter(f => f.issue === 'Знак не из моего набора')
+    expect(marks.map(f => f.fragment)).toEqual(['«'])
   })
 })

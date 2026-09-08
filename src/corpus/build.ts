@@ -9,7 +9,7 @@ import {
 import { insertTurns, pickHoldout } from '../search/indexer.js'
 import { stemsOf } from '../search/stem.js'
 import { countWords, markers, type Counts } from '../style/lexicon.js'
-import { findAntiPatterns } from '../style/antipatterns.js'
+import { findAntiPatterns, measureTypography } from '../style/antipatterns.js'
 import { measureRegisters, saveChatProfile } from '../style/profile.js'
 import { emptyStats, type FilterStats } from './filter.js'
 import { iterateChats, readDump, resolveOwnerId } from './parse.js'
@@ -118,6 +118,7 @@ export function buildCorpus(
         (word.length >= 4 && prefixes.has(word.slice(0, 4))),
     }),
     antiPatterns: findAntiPatterns(turns),
+    typography: measureTypography(turns.flatMap(t => t.parts)),
   })
   setMeta(db, 'owner_id', ownerId)
   setMeta(db, 'built_at', builtAt)

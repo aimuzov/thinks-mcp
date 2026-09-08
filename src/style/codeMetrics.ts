@@ -1,4 +1,4 @@
-import { word } from './antipatterns.js'
+import { measureTypography, word, type AntiPattern } from './antipatterns.js'
 
 /** Sizes measured within one genre. */
 export interface GenreSizes {
@@ -41,6 +41,18 @@ export interface CodeMetrics {
   connectives: { phrase: string; count: number; share: number }[]
   /** Blocks per repository, so the profile can show where the corpus came from. */
   repos: { repo: string; blocks: number }[]
+  /** Typographic marks per genre, counted over comment lines. */
+  typography?: Partial<Record<'code' | 'jsdoc', AntiPattern[]>>
+  /**
+   * Last year included in the typography count, exclusive. Zero means the whole
+   * corpus was counted.
+   *
+   * Only this measure takes a window, and it takes one because it is the
+   * measure a model can corrupt: comments written with an assistant carry its
+   * marks, `git blame` still calls them the owner's, and counting them teaches
+   * the assistant what the assistant already wrote.
+   */
+  typographyUntil?: number
 }
 
 export interface CodeBlockInput {
@@ -49,7 +61,18 @@ export interface CodeBlockInput {
   text: string
   isDoc: boolean
   lang: 'ru' | 'en'
+  /** Year of the commit the block was last written in. */
+  year: number
 }
+
+/**
+ * Fewer handwritten lines than this and the genre goes unmeasured.
+ *
+ * A window can cut a genre down to a handful of lines, and a mark absent from
+ * twenty lines is not a mark the owner avoids. Better no number than a
+ * confident zero.
+ */
+const MIN_TYPOGRAPHY_LINES = 200
 
 /**
  * Marker vocabulary counted per block. Which ones are the author's own is
@@ -147,7 +170,10 @@ function sizesOf(blocks: CodeBlockInput[]): GenreSizes {
   }
 }
 
-export function measureCode(blocks: CodeBlockInput[]): CodeMetrics {
+export function measureCode(
+  blocks: CodeBlockInput[],
+  typographyUntil = 0
+): CodeMetrics {
   const total = blocks.length || 1
 
   let lines = 0
@@ -201,5 +227,32 @@ export function measureCode(blocks: CodeBlockInput[]): CodeMetrics {
     repos: [...repoCounts.entries()]
       .map(([repo, blocks]) => ({ repo, blocks }))
       .sort((a, b) => b.blocks - a.blocks),
+    typography: typographyOf(blocks, typographyUntil),
+    typographyUntil,
+  }
+}
+
+/** Marks per genre, counted over the handwritten window only. */
+function typographyOf(
+  blocks: CodeBlockInput[],
+  until: number
+): CodeMetrics['typography'] {
+  const handwritten = until ? blocks.filter(b => b.year < until) : blocks
+
+  const perGenre = (isDoc: boolean) => {
+    const lines = handwritten
+      .filter(b => b.isDoc === isDoc)
+      .flatMap(b => b.lines)
+      .filter(Boolean)
+    return lines.length >= MIN_TYPOGRAPHY_LINES
+      ? measureTypography(lines)
+      : undefined
+  }
+
+  const code = perGenre(false)
+  const jsdoc = perGenre(true)
+  return {
+    ...(code ? { code } : {}),
+    ...(jsdoc ? { jsdoc } : {}),
   }
 }

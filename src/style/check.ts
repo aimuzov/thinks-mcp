@@ -1,7 +1,15 @@
 import { isCodeRegister, type Register } from '../corpus/types.js'
-import { listShare, markdownShare, RARE_SHARE, word } from './antipatterns.js'
+import {
+  FOREIGN_TYPOGRAPHY,
+  listShare,
+  markdownShare,
+  RARE_SHARE,
+  shareOf,
+  TYPO_FOREIGN_SHARE,
+  word,
+} from './antipatterns.js'
 import { splitMarkers } from './codeMetrics.js'
-import { metricsFor, type StyleProfile } from './profile.js'
+import { metricsFor, typographyFor, type StyleProfile } from './profile.js'
 
 export interface Finding {
   /** What tripped, in the owner's terms. */
@@ -38,6 +46,39 @@ const CLERICAL: { label: string; test: RegExp }[] = [
 
 const truncate = (s: string, n = 60) =>
   s.length <= n ? s : `${s.slice(0, n - 1)}…`
+
+/**
+ * Typographic marks held against the text, one register at a time.
+ *
+ * Same rule as the formatting habits above: a mark counts as foreign only
+ * where the corpus says so. The double hyphen is measured but never checked --
+ * in code it is how the owner writes a dash, and a stray `--` in a comment is
+ * as often a CLI flag as a mark.
+ */
+function typographyFindings(
+  text: string,
+  profile: StyleProfile,
+  register: Register
+): Finding[] {
+  const measured = typographyFor(profile, register)
+  if (!measured) return []
+
+  const out: Finding[] = []
+  for (const probe of FOREIGN_TYPOGRAPHY) {
+    const share = shareOf(measured, probe.label)
+    if (share === undefined || share >= TYPO_FOREIGN_SHARE) continue
+
+    const match = text.match(probe.test)
+    if (!match) continue
+    out.push({
+      issue: 'Знак не из моего набора',
+      fragment: match[0],
+      detail: `${probe.label}: доля моих сообщений ${share}%`,
+      penalty: 10,
+    })
+  }
+  return out
+}
 
 /**
  * Score a text against the measured profile.
@@ -198,6 +239,8 @@ export function checkText(
       })
     }
   }
+
+  findings.push(...typographyFindings(whole, profile, register))
 
   const penalty = findings.reduce((n, f) => n + f.penalty, 0)
   const score = Math.max(0, Math.min(100, 100 - penalty))
@@ -362,6 +405,8 @@ function checkComment(
       penalty: 10,
     })
   }
+
+  findings.push(...typographyFindings(whole, profile, register))
 
   if (register === 'jsdoc' && /@(param|returns)\s*\{/.test(whole)) {
     findings.push({

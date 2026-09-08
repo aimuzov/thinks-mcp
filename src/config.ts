@@ -32,6 +32,16 @@ export interface Config {
    * describe this window rather than the average of every year on record.
    */
   recentYears: number
+  /**
+   * Year the owner stopped writing comments by hand, exclusive. Zero means they
+   * still do.
+   *
+   * Comments written with an assistant pass `git blame` as the owner's, and
+   * they carry the assistant's typography. Everything from this year on is
+   * still indexed and still searchable -- it just does not count towards the
+   * marks the owner is said to avoid.
+   */
+  codeHandwrittenUntil: number
 }
 
 type Env = Record<string, string | undefined>
@@ -76,6 +86,8 @@ export function loadConfig(env: Env = process.env): Config {
     recentYears:
       Number.parseInt(env.THINKS_RECENT_YEARS ?? '', 10) ||
       DEFAULT_RECENT_YEARS,
+    codeHandwrittenUntil:
+      Number.parseInt(env.THINKS_CODE_HANDWRITTEN_UNTIL ?? '', 10) || 0,
   }
 }
 

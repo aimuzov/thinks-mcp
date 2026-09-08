@@ -27,6 +27,7 @@ function seededConfig(): Config {
     holdoutSize: 0,
     codeEmails: [],
     recentYears: 3,
+    codeHandwrittenUntil: 0,
   }
   buildCorpus(cfg)
   return cfg

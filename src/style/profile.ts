@@ -3,9 +3,14 @@ import { isCodeRegister, type Register } from '../corpus/types.js'
 import { measure, type RegisterMetrics } from './metrics.js'
 import type { Marker } from './lexicon.js'
 import {
+  DOUBLE_HYPHEN,
+  FOREIGN_TYPOGRAPHY,
   listShare,
   markdownShare,
   RARE_SHARE,
+  shareOf,
+  TYPO_FOREIGN_SHARE,
+  TYPO_OWN_SHARE,
   type AntiPattern,
 } from './antipatterns.js'
 import type { CodeMetrics } from './codeMetrics.js'
@@ -32,6 +37,8 @@ export interface StyleProfile {
   recentFrom: number
   markers: Marker[]
   antiPatterns: AntiPattern[]
+  /** Typographic marks in the chat corpus. Absent in a profile built before. */
+  typography?: AntiPattern[]
   /** Present once the code corpus has been built. */
   code?: CodeMetrics
 }
@@ -53,6 +60,7 @@ interface ChatPart {
   recentFrom?: number
   markers: Marker[]
   antiPatterns: AntiPattern[]
+  typography?: AntiPattern[]
 }
 
 interface CodePart {
@@ -97,6 +105,7 @@ export function loadProfile(db: Db): StyleProfile | null {
     recentFrom: chat?.recentFrom ?? code?.recentFrom ?? 0,
     markers: chat?.markers ?? [],
     antiPatterns: chat?.antiPatterns ?? [],
+    ...(chat?.typography ? { typography: chat.typography } : {}),
     ...(code ? { code: code.code } : {}),
   }
 }
@@ -115,6 +124,42 @@ export function metricsFor(
   const recent = profile.recent?.[register]
   if (recent && recent.messages >= MIN_RECENT_MESSAGES) return recent
   return profile.registers[register]
+}
+
+/**
+ * Typographic marks measured for the register, or undefined when the corpus
+ * behind it was built before the probes existed.
+ *
+ * Chat and code are counted separately and differ where it matters: `--` is
+ * absent from the archive's messages and normal in its comments.
+ */
+export function typographyFor(
+  profile: StyleProfile,
+  register: Register
+): AntiPattern[] | undefined {
+  if (isCodeRegister(register)) {
+    return profile.code?.typography?.[register as 'code' | 'jsdoc']
+  }
+  return profile.typography
+}
+
+/** Marks measured as foreign for the register, with their shares. */
+export function foreignMarks(
+  profile: StyleProfile,
+  register: Register
+): { label: string; share: number }[] {
+  const measured = typographyFor(profile, register)
+  if (!measured) return []
+
+  return FOREIGN_TYPOGRAPHY.map(probe => ({
+    label: probe.label,
+    share: shareOf(measured, probe.label),
+  }))
+    .filter(
+      (x): x is { label: string; share: number } =>
+        x.share !== undefined && x.share < TYPO_FOREIGN_SHARE
+    )
+    .sort((a, b) => a.share - b.share)
 }
 
 /** Measure the given registers off the stored corpus. */
@@ -164,7 +209,10 @@ export function renderProfile(
     if (!profile.code) {
       return 'Корпус кода не собран. Запусти `thinks-mcp code <пути к репозиториям>`.'
     }
-    return renderCodeProfile(profile.code, register as 'code' | 'jsdoc', opts)
+    return [
+      renderCodeProfile(profile.code, register as 'code' | 'jsdoc', opts),
+      ...typographySection(profile, register),
+    ].join('\n')
   }
 
   const m = metricsFor(profile, register)
@@ -271,7 +319,43 @@ export function renderProfile(
     lines.push('')
   }
 
+  lines.push(...typographySection(profile, register))
+
   return lines.join('\n')
+}
+
+/**
+ * The typography block of a rendered profile, shared by chat and code.
+ *
+ * Empty when the corpus was built before the probes existed: silence is the
+ * honest answer there, an unmeasured mark is not a mark the owner avoids.
+ */
+export function typographySection(
+  profile: StyleProfile,
+  register: Register
+): string[] {
+  const marks = foreignMarks(profile, register)
+  const hyphen = shareOf(typographyFor(profile, register), DOUBLE_HYPHEN.label)
+  const ownHyphen = hyphen !== undefined && hyphen >= TYPO_OWN_SHARE
+  if (!marks.length && !ownHyphen) return []
+
+  const lines = ['## Знаки']
+  const until = isCodeRegister(register) ? profile.code?.typographyUntil : 0
+  if (until) {
+    lines.push(
+      `- Считано по комментариям до ${until} года: дальше я писал их с ` +
+        'ассистентом, и его знаки за мои не считаются.'
+    )
+  }
+  if (marks.length) {
+    lines.push('- Этого набора у меня почти нет (доля сообщений):')
+    for (const m of marks) lines.push(`  - ${m.label}: ${m.share}%`)
+  }
+  if (ownHyphen) {
+    lines.push(`- Тире пишу двумя дефисами: так в ${hyphen}% случаев.`)
+  }
+  lines.push('')
+  return lines
 }
 
 /** Numeric constraints for the CONSTRAINTS block of a brief. */
@@ -281,7 +365,10 @@ export function constraintsOf(
 ): string[] {
   if (isCodeRegister(register)) {
     return profile.code
-      ? codeConstraints(profile.code, register as 'code' | 'jsdoc')
+      ? [
+          ...codeConstraints(profile.code, register as 'code' | 'jsdoc'),
+          ...typographyConstraints(profile, register),
+        ]
       : []
   }
 
@@ -342,6 +429,35 @@ export function constraintsOf(
       `Разговорные формы — норма, не выправляй их в литературные: ` +
         `${colloquial.join(', ')}.`
     )
+  }
+
+  out.push(...typographyConstraints(profile, register))
+
+  return out
+}
+
+/**
+ * The typography lines of a brief.
+ *
+ * A model types the marks of a printed book by default. The archive says which
+ * of them the owner actually puts on the page, and at what rate.
+ */
+export function typographyConstraints(
+  profile: StyleProfile,
+  register: Register
+): string[] {
+  const out: string[] = []
+  const marks = foreignMarks(profile, register)
+  if (marks.length) {
+    out.push(
+      `Не ставь эти знаки: ${marks.map(m => `${m.label} (${m.share}%)`).join(', ')}. ` +
+        'Вместо тире обычный дефис, вместо ёлочек простые двойные кавычки.'
+    )
+  }
+
+  const hyphen = shareOf(typographyFor(profile, register), DOUBLE_HYPHEN.label)
+  if (hyphen !== undefined && hyphen >= TYPO_OWN_SHARE) {
+    out.push(`Тире внутри фразы — два дефиса: так в ${hyphen}% случаев.`)
   }
 
   return out

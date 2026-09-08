@@ -208,6 +208,29 @@ you are now nor the one you were ten years ago. So:
   typical BM25 spread in a result set: recency matters, but an irrelevant new
   message does not outrank a relevant old one.
 
+## Typography
+
+Guillemets, em and en dashes, curly quotes: the typography of a printed book,
+which a model reaches for by default. Whether the owner of the archive reaches
+for it is decided by measurement — the share of messages carrying each mark,
+counted separately for chat and for each code genre. Below 2% the mark enters
+the profile as foreign, `check_as_me` penalises it, and the brief asks for a
+plain hyphen and straight quotes instead. The threshold is its own rather than
+the shared anti-pattern one: a dash in 1% of messages already gives a text away,
+while a clerical word at that share does not.
+
+The double hyphen is measured and never penalised. It is not a foreign mark but
+an ASCII stand-in for a dash, and it differs by register: absent from chat,
+normal in comments. Where its share reaches 1%, the brief asks for it outright.
+
+Comments written with an assistant are a problem of their own. `git blame` calls
+them yours while their marks are its: in this author's corpus the share of
+guillemets in docblocks jumped from zero to 6% in 2026. Set the year you stopped
+writing comments by hand in `THINKS_CODE_HANDWRITTEN_UNTIL`; everything from
+that year on stays indexed and searchable but does not count towards the marks.
+If a genre keeps fewer than 200 lines after the cut, its marks go unmeasured —
+a confident zero over twenty lines is worse than no number.
+
 ## Privacy
 
 This is a private message archive, so:
@@ -262,6 +285,7 @@ said.
 | `THINKS_CHAT_STOPLIST` | empty | comma-separated chats to skip |
 | `THINKS_CODE_EMAILS` | `git config --global user.email` | comma-separated git author emails |
 | `THINKS_RECENT_YEARS` | `3` | window that counts as "how I write now" |
+| `THINKS_CODE_HANDWRITTEN_UNTIL` | none | year comments stopped being handwritten, for the typography count |
 | `THINKS_BURST_WINDOW` | `90` | burst window in seconds |
 | `THINKS_LONGFORM_MIN` | `300` | longform threshold in characters |
 | `THINKS_HOLDOUT` | `20` | pairs held out for the blind check |

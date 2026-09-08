@@ -5,6 +5,17 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Typographic marks (`«»`, `—`, `–`, `“”`, `--`) are measured per register and
+  reported in the profile. A mark below 2% of messages counts as foreign:
+  `check_as_me` penalises it and briefs ask for a plain hyphen and straight
+  quotes instead. The double hyphen is measured but never penalised — in code it
+  is how the author writes a dash.
+- `THINKS_CODE_HANDWRITTEN_UNTIL` keeps comments written with an assistant out
+  of the typography count. `git blame` calls them the owner's, and counting them
+  teaches the assistant what the assistant already wrote.
+
 ## [0.1.1] — 2026-09-06
 
 ### Fixed
