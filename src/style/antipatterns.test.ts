@@ -20,6 +20,12 @@ describe('measureTypography', () => {
     expect(share('двойной дефис --', texts)).toBe(20)
   })
 
+  it('tells the ellipsis character and the arrow from their ASCII spelling', () => {
+    const texts = ['Ну...', 'Ну…', 'a => b', 'a → b']
+    expect(share('многоточие одним знаком …', texts)).toBe(25)
+    expect(share('стрелка →', texts)).toBe(25)
+  })
+
   it('leaves every probe at zero for a corpus without them', () => {
     const measured = measureTypography(['Обычный текст без знаков.'])
     expect(measured.every(a => a.share === 0)).toBe(true)

@@ -16,13 +16,13 @@ const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозито
   serve             запустить MCP-сервер на stdio (по умолчанию)
   build <dump.json> собрать корпус и профиль из выгрузки Telegram
   code <пути...>    собрать корпус комментариев из git-репозиториев.
-                    Авторство определяется по email — задай THINKS_CODE_EMAILS
+                    Авторство определяется по email -- задай THINKS_CODE_EMAILS
                     через запятую, иначе берётся git config --global user.email
   profile [reg]     напечатать стиль-профиль
                     (dm | group | longform | code | jsdoc)
   holdout [--answers]
                     отложенные пары для слепой проверки: входящие сообщения,
-                    которых нет в индексе. С --answers — настоящие ответы,
+                    которых нет в индексе. С --answers -- настоящие ответы,
                     чтобы сравнить с тем, что сочинила модель
   where             показать, где лежат корпус и профиль
 
@@ -34,7 +34,9 @@ const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозито
   THINKS_OWNER_ID   id владельца, если автоопределение ошиблось
   THINKS_CHAT_STOPLIST  чаты через запятую, которые не попадут в корпус
   THINKS_CODE_EMAILS    git-адреса автора через запятую (личный и рабочий)
-  THINKS_RECENT_YEARS   сколько последних лет считать «как я пишу сейчас» (3)
+  THINKS_RECENT_YEARS   сколько последних лет считать "как я пишу сейчас" (3)
+  THINKS_NEVER_MARKS    знаки, которые не набираю, и замена:
+                        —:--,…:...,→:=>,«:",»:"
   THINKS_BURST_WINDOW, THINKS_LONGFORM_MIN, THINKS_HOLDOUT`
 
 async function main() {
@@ -101,7 +103,13 @@ async function main() {
       const db = openCorpusOrFail(cfg.dbPath)
       const profile = loadProfile(db)
       if (!profile) throw new Error(notBuilt(cfg.dbPath))
-      console.log(renderProfile(profile, raw as Register, { full: true }))
+      console.log(
+        renderProfile(
+          { ...profile, neverMarks: cfg.neverMarks },
+          raw as Register,
+          { full: true }
+        )
+      )
       db.close()
       return
     }

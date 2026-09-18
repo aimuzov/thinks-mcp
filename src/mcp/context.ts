@@ -11,9 +11,9 @@ export interface Corpus {
 
 export const CORPUS_MISSING =
   'Корпус не собран, поэтому отвечать твоим голосом пока не из чего.\n' +
-  'Выгрузи архив Telegram (Settings → Advanced → Export Telegram data, JSON) ' +
+  'Выгрузи архив Telegram (Settings > Advanced > Export Telegram data, JSON) ' +
   'и запусти:\n\n  thinks-mcp build <путь к result.json>\n\n' +
-  'Пересобирать сервер после этого не нужно — он подхватит корпус сам.'
+  'Пересобирать сервер после этого не нужно -- он подхватит корпус сам.'
 
 /**
  * Lazy handle on the corpus.
@@ -40,7 +40,10 @@ export class CorpusRef {
       return null
     }
 
-    this.corpus = { db, profile }
+    this.corpus = {
+      db,
+      profile: { ...profile, neverMarks: this.cfg.neverMarks },
+    }
     return this.corpus
   }
 

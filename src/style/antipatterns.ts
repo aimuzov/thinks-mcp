@@ -56,6 +56,8 @@ export const FOREIGN_TYPOGRAPHY: Probe[] = [
   { label: 'длинное тире —', test: /—/u },
   { label: 'короткое тире –', test: /–/u },
   { label: 'кавычки-лапки “”', test: /[“”]/u },
+  { label: 'многоточие одним знаком …', test: /…/u },
+  { label: 'стрелка →', test: /→/u },
 ]
 
 /**

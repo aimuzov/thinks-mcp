@@ -42,6 +42,21 @@ export interface Config {
    * marks the owner is said to avoid.
    */
   codeHandwrittenUntil: number
+  /**
+   * Marks the owner says they never type, held against every register.
+   *
+   * The one rule declared rather than measured. A mark put in by an autocorrect
+   * or a keyboard layout years ago still sits in the archive, and no threshold
+   * tells that apart from a habit -- only the owner can.
+   */
+  neverMarks: NeverMark[]
+}
+
+/** A mark the owner never types, with what they type in its place. */
+export interface NeverMark {
+  mark: string
+  /** Empty when the owner named the mark without a replacement. */
+  standIn: string
 }
 
 type Env = Record<string, string | undefined>
@@ -88,7 +103,25 @@ export function loadConfig(env: Env = process.env): Config {
       DEFAULT_RECENT_YEARS,
     codeHandwrittenUntil:
       Number.parseInt(env.THINKS_CODE_HANDWRITTEN_UNTIL ?? '', 10) || 0,
+    neverMarks: parseNeverMarks(env.THINKS_NEVER_MARKS),
   }
+}
+
+/**
+ * `—:--,…:...,→:=>,«:",»:"` -- a mark, a colon, what to type instead.
+ *
+ * Split on the first colon after the mark, so a stand-in may hold a colon of
+ * its own.
+ */
+function parseNeverMarks(raw: string | undefined): NeverMark[] {
+  return splitList(raw).map(pair => {
+    const colon = pair.indexOf(':', 1)
+    if (colon === -1) return { mark: pair, standIn: '' }
+    return {
+      mark: pair.slice(0, colon).trim(),
+      standIn: pair.slice(colon + 1).trim(),
+    }
+  })
 }
 
 function splitList(raw: string | undefined): string[] {

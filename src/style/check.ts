@@ -1,15 +1,7 @@
 import { isCodeRegister, type Register } from '../corpus/types.js'
-import {
-  FOREIGN_TYPOGRAPHY,
-  listShare,
-  markdownShare,
-  RARE_SHARE,
-  shareOf,
-  TYPO_FOREIGN_SHARE,
-  word,
-} from './antipatterns.js'
+import { listShare, markdownShare, RARE_SHARE, word } from './antipatterns.js'
 import { splitMarkers } from './codeMetrics.js'
-import { metricsFor, typographyFor, type StyleProfile } from './profile.js'
+import { foreignMarks, metricsFor, type StyleProfile } from './profile.js'
 
 export interface Finding {
   /** What tripped, in the owner's terms. */
@@ -45,39 +37,58 @@ const CLERICAL: { label: string; test: RegExp }[] = [
 ]
 
 const truncate = (s: string, n = 60) =>
-  s.length <= n ? s : `${s.slice(0, n - 1)}…`
+  s.length <= n ? s : `${s.slice(0, n - 3)}...`
 
 /**
  * Typographic marks held against the text, one register at a time.
  *
  * Same rule as the formatting habits above: a mark counts as foreign only
- * where the corpus says so. The double hyphen is measured but never checked --
- * in code it is how the owner writes a dash, and a stray `--` in a comment is
- * as often a CLI flag as a mark.
+ * where the corpus says so, or where the owner said so in `THINKS_NEVER_MARKS`
+ * -- in every register at once. The double hyphen is measured but never
+ * checked -- in code it is how the owner writes a dash, and a stray `--` in a
+ * comment is as often a CLI flag as a mark.
  */
 function typographyFindings(
   text: string,
   profile: StyleProfile,
   register: Register
 ): Finding[] {
-  const measured = typographyFor(profile, register)
-  if (!measured) return []
-
   const out: Finding[] = []
-  for (const probe of FOREIGN_TYPOGRAPHY) {
-    const share = shareOf(measured, probe.label)
-    if (share === undefined || share >= TYPO_FOREIGN_SHARE) continue
 
+  // Declared marks come first and cost more: the owner said so outright, there
+  // is no share to be wrong about. The fragment keeps a word on each side --
+  // a bare `—` does not tell which of five dashes to fix.
+  for (const { mark, standIn } of profile.neverMarks ?? []) {
+    const at = text.indexOf(mark)
+    if (at === -1) continue
+    out.push({
+      issue: 'Знак, который я не набираю',
+      fragment: truncate(around(text, at, mark.length)),
+      detail: standIn
+        ? `пиши \`${standIn}\` вместо ${mark}`
+        : `${mark} не ставлю`,
+      penalty: 15,
+    })
+  }
+
+  for (const probe of foreignMarks(profile, register)) {
     const match = text.match(probe.test)
     if (!match) continue
     out.push({
       issue: 'Знак не из моего набора',
       fragment: match[0],
-      detail: `${probe.label}: доля моих сообщений ${share}%`,
+      detail: `${probe.label}: доля моих сообщений ${probe.share}%`,
       penalty: 10,
     })
   }
   return out
+}
+
+/** The token at `at` with one neighbouring word on each side, on one line. */
+function around(text: string, at: number, length: number): string {
+  const before = text.slice(0, at).match(/(?:\S+\s+)?\S*$/u)?.[0] ?? ''
+  const after = text.slice(at + length).match(/^\S*(?:\s+\S+)?/u)?.[0] ?? ''
+  return `${before}${text.slice(at, at + length)}${after}`.replace(/\s+/gu, ' ')
 }
 
 /**
@@ -210,7 +221,7 @@ export function checkText(
     /^\s*([-–—•*]|\d[.)])\s+\S/m.test(whole)
   ) {
     findings.push({
-      issue: 'Список — я так не пишу',
+      issue: 'Список -- я так не пишу',
       detail: `списки встречаются в ${lists}% моих сообщений`,
       penalty: 15,
     })
@@ -234,7 +245,7 @@ export function checkText(
       findings.push({
         issue: 'Канцелярит',
         fragment: match[0],
-        detail: `«${probe.label}» я практически не употребляю`,
+        detail: `"${probe.label}" я практически не употребляю`,
         penalty: 10,
       })
     }
@@ -333,7 +344,7 @@ function checkComment(
         issue: 'Пересказ кода',
         fragment: truncate(whole, 50),
         detail:
-          `${Math.round(overlap * 100)}% слов комментария повторяют код рядом — ` +
+          `${Math.round(overlap * 100)}% слов комментария повторяют код рядом -- ` +
           'скажи, почему так сделано, а не что тут написано',
         penalty: 30,
       })
@@ -378,7 +389,7 @@ function checkComment(
       findings.push({
         issue: 'Канцелярит',
         fragment: match[0],
-        detail: `«${probe.label}» я практически не употребляю`,
+        detail: `"${probe.label}" я практически не употребляю`,
         penalty: 10,
       })
     }
@@ -438,10 +449,10 @@ function checkComment(
 const CODE_WATER: { test: RegExp; why: string }[] = [
   {
     test: /эт[аот]\p{L}*\s+(метод|функци\p{L}*|класс|компонент)\s+(отвечает|предназначен)/iu,
-    why: 'вода вместо факта — скажи, что именно делает и почему так',
+    why: 'вода вместо факта -- скажи, что именно делает и почему так',
   },
-  { test: /важно отметить/iu, why: 'если важно — скажи что именно' },
-  { test: /стоит учитывать/iu, why: 'если стоит — скажи что именно' },
+  { test: /важно отметить/iu, why: 'если важно -- скажи что именно' },
+  { test: /стоит учитывать/iu, why: 'если стоит -- скажи что именно' },
   {
     test: /обеспечива\p{L}*\s+надёжност/iu,
     why: 'ничего не значит',
@@ -452,14 +463,14 @@ const CODE_WATER: { test: RegExp; why: string }[] = [
 function verdictFor(score: number): string {
   if (score >= 85) return 'Похоже на меня.'
   if (score >= 65) return 'В целом похоже, но есть что поправить.'
-  if (score >= 40) return 'Узнаётся с трудом — перепиши по замечаниям.'
+  if (score >= 40) return 'Узнаётся с трудом -- перепиши по замечаниям.'
   return 'Это не мой голос.'
 }
 
 /** Render a report as the text the tool returns. */
 export function renderCheck(report: CheckReport): string {
   const lines = [
-    `Оценка: ${report.score}/100 — ${report.verdict}`,
+    `Оценка: ${report.score}/100 -- ${report.verdict}`,
     `Регистр: ${report.register}, сообщений: ${report.messages}`,
   ]
 
@@ -470,7 +481,9 @@ export function renderCheck(report: CheckReport): string {
 
   lines.push('', 'Что выдаёт не меня:')
   for (const f of report.findings) {
-    const fragment = f.fragment ? ` — «${f.fragment}»` : ''
+    // Straight quotes: a fragment is often the guillemet itself, and wrapping
+    // it in more of them makes the finding unreadable.
+    const fragment = f.fragment ? ` -- "${f.fragment}"` : ''
     lines.push(`- ${f.issue}${fragment}: ${f.detail}`)
   }
   lines.push('', 'Перепиши текст с учётом этих замечаний и проверь ещё раз.')
