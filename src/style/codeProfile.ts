@@ -21,7 +21,7 @@ export function renderCodeProfile(
   const sizes = code.genres[register]
 
   lines.push(
-    `# Как я комментирую код — ${isDoc ? 'JSDoc' : 'инлайн'}`,
+    `# Как я комментирую код -- ${isDoc ? 'JSDoc' : 'инлайн'}`,
     '',
     `Замерено по ${sizes.blocks.toLocaleString('ru')} блокам этого жанра ` +
       `(всего в корпусе ${code.blocks.toLocaleString('ru')} из моих репозиториев).`,
@@ -34,11 +34,11 @@ export function renderCodeProfile(
       `90% короче ${sizes.lineWidth.p90}.`
   )
   lines.push(
-    `- Однострочных блоков — ${pct(sizes.blockLines.oneLiners)}: если сказать ` +
+    `- Однострочных блоков -- ${pct(sizes.blockLines.oneLiners)}: если сказать ` +
       'нечего сверх одной фразы, одной строкой и ограничиваюсь.'
   )
   lines.push(
-    `- Когда объясняю развёрнуто — медиана ${sizes.blockLines.medianMulti} строк, ` +
+    `- Когда объясняю развёрнуто -- медиана ${sizes.blockLines.medianMulti} строк, ` +
       `90% блоков короче ${sizes.blockLines.p90}.`
   )
   lines.push('')
@@ -46,18 +46,18 @@ export function renderCodeProfile(
   lines.push('## Язык')
   lines.push(
     `- По-русски написано ${pct(sizes.russian)} комментариев этого жанра. ` +
-      'Язык выбирается по файлу, а не по привычке: как вокруг — так и пишу.'
+      'Язык выбирается по файлу, а не по привычке: как вокруг -- так и пишу.'
   )
   lines.push('')
 
   if (code.connectives.length) {
     lines.push('## Как я объясняю')
     lines.push(
-      '- Комментарий отвечает на «почему», и это видно по связкам причинности. ' +
+      '- Комментарий отвечает на "почему", и это видно по связкам причинности. ' +
         'Частота в моих блоках:'
     )
     for (const c of code.connectives.slice(0, opts.full ? 12 : 6)) {
-      lines.push(`  - «${c.phrase}» — ${c.count} (${pct(c.share)})`)
+      lines.push(`  - "${c.phrase}" -- ${c.count} (${pct(c.share)})`)
     }
     lines.push('')
   }
@@ -69,7 +69,7 @@ export function renderCodeProfile(
       .map(m => `${m.name} (${m.count})`)
     const stray = code.markers
       .filter(m => !own.includes(m.name))
-      .map(m => `${m.name} — ${m.count}`)
+      .map(m => `${m.name} -- ${m.count}`)
     lines.push('## Маркеры')
     lines.push(`- Пользуюсь только этими: ${used.join(', ')}.`)
     lines.push(
@@ -101,22 +101,22 @@ export function codeConstraints(
 ): string[] {
   const sizes = code.genres[register]
   const out = [
-    `Строка комментария — не длиннее ${sizes.lineWidth.p90} символов ` +
+    `Строка комментария -- не длиннее ${sizes.lineWidth.p90} символов ` +
       `(медиана ${sizes.lineWidth.median}). Переносить по смыслу, а не по ширине.`,
-    `Однострочный блок — норма (${pct(sizes.blockLines.oneLiners)}). ` +
-      `Если объясняешь развёрнуто — ${sizes.blockLines.medianMulti} строк, ` +
+    `Однострочный блок -- норма (${pct(sizes.blockLines.oneLiners)}). ` +
+      `Если объясняешь развёрнуто -- ${sizes.blockLines.medianMulti} строк, ` +
       `не больше ${sizes.blockLines.p90}.`,
   ]
 
   if (register === 'jsdoc') {
     out.push(
-      'Первая строка — одно предложение с точкой, дальше пустая `*` и абзацы.',
-      '`@param name - Описание.` без типа в фигурных скобках — типы даёт TypeScript.',
+      'Первая строка -- одно предложение с точкой, дальше пустая `*` и абзацы.',
+      '`@param name - Описание.` без типа в фигурных скобках -- типы даёт TypeScript.',
       'Не использовать `@function`, `@memberof`, `@returns {Type}`, `@param {Type}`.'
     )
   } else {
     out.push(
-      'Полное предложение — с точкой. Короткий ярлык над блоком — без точки.'
+      'Полное предложение -- с точкой. Короткий ярлык над блоком -- без точки.'
     )
     const { own } = splitMarkers(code)
     if (own.length) {
@@ -127,12 +127,12 @@ export function codeConstraints(
   }
 
   out.push(
-    'Комментарий отвечает на «почему», «что сломается иначе» или «какой внешний ' +
-      'факт вынудил». Пересказ кода запрещён.',
-    'Причину не выдумывать: нет подтверждения — писать только проверяемый факт ' +
+    'Комментарий отвечает на "почему", "что сломается иначе" или "какой внешний ' +
+      'факт вынудил". Пересказ кода запрещён.',
+    'Причину не выдумывать: нет подтверждения -- писать только проверяемый факт ' +
       'либо TODO с честной формулировкой незнания.',
-    `Язык — как в остальных комментариях файла (по корпусу: ${Math.round(code.russian * 100)}% по-русски).`,
-    'Ни эмодзи, ни markdown-заголовков, ни «✅/❌» внутри комментариев.'
+    `Язык -- как в остальных комментариях файла (по корпусу: ${Math.round(code.russian * 100)}% по-русски).`,
+    'Ни эмодзи, ни markdown-заголовков, ни "✅/❌" внутри комментариев.'
   )
 
   return out

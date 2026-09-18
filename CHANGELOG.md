@@ -5,6 +5,16 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `THINKS_NEVER_MARKS` declares marks the owner never types, with their
+  stand-ins (`—:--,…:...,→:=>,«:",»:"`). `check_as_me` penalises a declared
+  mark in every register regardless of its measured share, quoting it in
+  context and naming the stand-in; every brief asks for the stand-in. A measured finding
+  for the same mark is dropped so it is not charged twice.
+- The ellipsis character `…` and the arrow `→` are measured with the other
+  typographic marks. They take effect after the corpus is rebuilt.
+
 ## [0.2.0] — 2026-09-08
 
 ### Added

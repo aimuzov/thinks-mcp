@@ -59,6 +59,18 @@ describe('loadConfig', () => {
     expect(cfg.codeEmails).toEqual([])
   })
 
+  it('parses declared marks with their stand-ins', () => {
+    const cfg = loadConfig({ THINKS_NEVER_MARKS: '—:--, …:..., →:=>, «, ::' })
+    expect(cfg.neverMarks).toEqual([
+      { mark: '—', standIn: '--' },
+      { mark: '…', standIn: '...' },
+      { mark: '→', standIn: '=>' },
+      { mark: '«', standIn: '' },
+      { mark: ':', standIn: '' },
+    ])
+    expect(loadConfig({}).neverMarks).toEqual([])
+  })
+
   it('takes the dump path and the owner id verbatim', () => {
     const cfg = loadConfig({
       THINKS_DUMP: '/mnt/export/result.json',

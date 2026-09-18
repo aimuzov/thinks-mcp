@@ -29,7 +29,7 @@ export function registerCheckAsMe(server: McpServer, ctx: ToolContext) {
           .string()
           .min(1)
           .describe(
-            'Проверяемый текст. Если это несколько сообщений — по одному на строку.'
+            'Проверяемый текст. Если это несколько сообщений -- по одному на строку.'
           ),
         register: registerSchema.optional(),
         code: z
@@ -37,7 +37,7 @@ export function registerCheckAsMe(server: McpServer, ctx: ToolContext) {
           .optional()
           .describe(
             'Код, который комментируешь. Передавай для register code и jsdoc: ' +
-              'тогда проверка поймает пересказ кода — главный запрет, который ' +
+              'тогда проверка поймает пересказ кода -- главный запрет, который ' +
               'иначе не виден.'
           ),
       },

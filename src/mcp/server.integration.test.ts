@@ -28,6 +28,7 @@ function seededConfig(): Config {
     codeEmails: [],
     recentYears: 3,
     codeHandwrittenUntil: 0,
+    neverMarks: [],
   }
   buildCorpus(cfg)
   return cfg
@@ -145,6 +146,47 @@ describe('MCP server (end to end)', () => {
       'comment-as-me',
       'reply-as-me',
     ])
+  })
+
+  it('holds declared marks against every brief and every check', async () => {
+    const client = await connect({
+      ...cfg,
+      neverMarks: [
+        { mark: '…', standIn: '...' },
+        { mark: '—', standIn: '--' },
+        { mark: '→', standIn: '=>' },
+      ],
+    })
+
+    const briefs = [
+      { name: 'write_as_me', arguments: { brief: 'напиши, что задержусь' } },
+      {
+        name: 'reply_as_me',
+        arguments: { incoming: 'Ты когда освободишься?' },
+      },
+      { name: 'rephrase_as_me', arguments: { text: 'Я немного задержусь.' } },
+    ]
+    for (const call of briefs) {
+      expect(textOf(await client.callTool(call)), call.name).toContain(
+        '`...` вместо …, `--` вместо —, `=>` вместо →'
+      )
+    }
+
+    for (const register of ['dm', 'group', 'longform']) {
+      const result = await client.callTool({
+        name: 'check_as_me',
+        arguments: { text: 'Буду через час — может… позже.', register },
+      })
+      const report = result.structuredContent as {
+        findings: { issue: string; fragment?: string }[]
+      }
+      expect(
+        report.findings
+          .filter(f => f.issue === 'Знак, который я не набираю')
+          .map(f => f.fragment),
+        register
+      ).toEqual(['— может… позже.', 'час — может…'])
+    }
   })
 
   it('accepts every register the corpus can hold', async () => {

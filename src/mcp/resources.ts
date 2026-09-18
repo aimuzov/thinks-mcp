@@ -48,8 +48,8 @@ export function registerResources(server: McpServer, ctx: ToolContext) {
     {
       title: 'Стиль-профиль по регистру',
       description:
-        'dm — личка, group — групповой чат, longform — длинный текст, ' +
-        'code — инлайн-комментарий, jsdoc — докблок.',
+        'dm -- личка, group -- групповой чат, longform -- длинный текст, ' +
+        'code -- инлайн-комментарий, jsdoc -- докблок.',
       mimeType: 'text/markdown',
     },
     async (uri, variables) => {

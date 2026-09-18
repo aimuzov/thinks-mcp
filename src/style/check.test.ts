@@ -84,7 +84,7 @@ describe('checkText', () => {
 
   it('flags bullet lists and markdown', () => {
     const found = issues('Смотри:\n- первое\n- второе\nи **важное**')
-    expect(found).toContain('Список — я так не пишу')
+    expect(found).toContain('Список -- я так не пишу')
     expect(found).toContain('Markdown-разметка')
   })
 
@@ -94,13 +94,13 @@ describe('checkText', () => {
       antiPatterns: [{ label: 'списки через дефис', hits: 5000, share: 3.1 }],
     }
     const found = checkText('Смотри:\n- первое\n- второе', listy).findings
-    expect(found.map(f => f.issue)).not.toContain('Список — я так не пишу')
+    expect(found.map(f => f.issue)).not.toContain('Список -- я так не пишу')
   })
 
   it('does not assert formatting habits that were never measured', () => {
     const unmeasured: StyleProfile = { ...profile, antiPatterns: [] }
     const found = checkText('- первое\n**второе**', unmeasured).findings
-    expect(found.map(f => f.issue)).not.toContain('Список — я так не пишу')
+    expect(found.map(f => f.issue)).not.toContain('Список -- я так не пишу')
     expect(found.map(f => f.issue)).not.toContain('Markdown-разметка')
   })
 
@@ -174,6 +174,58 @@ describe('checkText on typography', () => {
   it('says nothing about marks that were never measured', () => {
     const found = checkText('Он сказал «нет» — и ушёл.', profile, 'dm').findings
     expect(found.map(f => f.issue)).not.toContain('Знак не из моего набора')
+  })
+
+  it('holds a declared mark against a text whatever the archive says', () => {
+    const declared: StyleProfile = {
+      ...typed({ 'длинное тире —': 4.3 }),
+      neverMarks: [{ mark: '—', standIn: '--' }],
+    }
+    const found = checkText('Плов — пусть готовит.', declared, 'dm').findings
+    expect(found).toEqual([
+      {
+        issue: 'Знак, который я не набираю',
+        fragment: 'Плов — пусть',
+        detail: 'пиши `--` вместо —',
+        penalty: 15,
+      },
+    ])
+  })
+
+  it('does not charge twice for a mark both declared and measured', () => {
+    const both: StyleProfile = {
+      ...typed({ 'длинное тире —': 1.1, 'многоточие одним знаком …': 0.2 }),
+      neverMarks: [{ mark: '—', standIn: '--' }],
+    }
+    const found = checkText('Плов — пусть… готовит.', both, 'dm').findings
+    expect(found.map(f => [f.issue, f.fragment])).toEqual([
+      ['Знак, который я не набираю', 'Плов — пусть…'],
+      ['Знак не из моего набора', '…'],
+    ])
+  })
+
+  it('holds each guillemet against a text as its own declared mark', () => {
+    const quoted: StyleProfile = {
+      ...profile,
+      neverMarks: [
+        { mark: '«', standIn: '"' },
+        { mark: '»', standIn: '"' },
+      ],
+    }
+    const found = checkText('Он сказал «нет» и ушёл.', quoted, 'dm').findings
+    expect(found.map(f => [f.fragment, f.detail])).toEqual([
+      ['сказал «нет» и', 'пиши `"` вместо «'],
+      ['сказал «нет» и', 'пиши `"` вместо »'],
+    ])
+  })
+
+  it('names a declared mark without a stand-in plainly', () => {
+    const bare: StyleProfile = {
+      ...profile,
+      neverMarks: [{ mark: '→', standIn: '' }],
+    }
+    const [finding] = checkText('Туда → сюда.', bare, 'dm').findings
+    expect(finding.detail).toBe('→ не ставлю')
   })
 
   it('never holds the double hyphen against a text', () => {
@@ -371,5 +423,36 @@ describe('checkText for comments', () => {
     const found = checkText(doc, mixed, 'jsdoc').findings
     const marks = found.filter(f => f.issue === 'Знак не из моего набора')
     expect(marks.map(f => f.fragment)).toEqual(['«'])
+  })
+
+  it('holds declared marks against a comment even where the archive has them', () => {
+    // The archive's handwritten comments do carry `—`, yet the owner says they
+    // never type it: the declaration wins over a share of 4.3%.
+    const declared: StyleProfile = {
+      ...withCode,
+      neverMarks: [
+        { mark: '…', standIn: '...' },
+        { mark: '—', standIn: '--' },
+        { mark: '→', standIn: '=>' },
+      ],
+      code: {
+        ...withCode.code!,
+        typography: {
+          jsdoc: [{ label: 'длинное тире —', hits: 300, share: 4.3 }],
+        },
+      },
+    }
+
+    const doc = [
+      'директория — это Section1, файл — Section2,',
+      'глубже идут Section3…6. Тег → тесты.',
+    ].join('\n')
+    const report = checkText(doc, declared, 'jsdoc', 'const TAGGED_DEPTH = 2')
+    expect(report.findings.map(f => [f.fragment, f.detail])).toEqual([
+      ['идут Section3…6. Тег', 'пиши `...` вместо …'],
+      ['директория — это', 'пиши `--` вместо —'],
+      ['Тег → тесты.', 'пиши `=>` вместо →'],
+    ])
+    expect(report.score).toBe(55)
   })
 })

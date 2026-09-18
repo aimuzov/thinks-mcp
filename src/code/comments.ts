@@ -209,7 +209,7 @@ function codeBelow(
     const trimmed = lines[i].trim()
     if (!trimmed) continue
     if (classify(lines[i], syntax)) return null
-    return trimmed.length > 160 ? `${trimmed.slice(0, 159)}…` : trimmed
+    return trimmed.length > 160 ? `${trimmed.slice(0, 157)}...` : trimmed
   }
   return null
 }

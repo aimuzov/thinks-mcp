@@ -231,6 +231,16 @@ that year on stays indexed and searchable but does not count towards the marks.
 If a genre keeps fewer than 200 lines after the cut, its marks go unmeasured —
 a confident zero over twenty lines is worse than no number.
 
+The ellipsis character `…` and the arrow `→` are measured the same way.
+
+Some marks a threshold cannot settle. An autocorrect or a keyboard layout may
+have put `—` into years of handwritten comments, and the archive then calls it
+a habit. `THINKS_NEVER_MARKS` is the one rule you declare instead of measure:
+`—:--,…:...,→:=>,«:",»:"` lists each mark with what you type in its place.
+A declared mark is penalised in every register whatever its measured share,
+the finding quotes it with a word on each side and names the stand-in, and
+every brief asks for the stand-in.
+
 ## Privacy
 
 This is a private message archive, so:
@@ -286,6 +296,7 @@ said.
 | `THINKS_CODE_EMAILS` | `git config --global user.email` | comma-separated git author emails |
 | `THINKS_RECENT_YEARS` | `3` | window that counts as "how I write now" |
 | `THINKS_CODE_HANDWRITTEN_UNTIL` | none | year comments stopped being handwritten, for the typography count |
+| `THINKS_NEVER_MARKS` | empty | marks you never type and their stand-ins, e.g. `—:--,…:...,→:=>,«:",»:"` |
 | `THINKS_BURST_WINDOW` | `90` | burst window in seconds |
 | `THINKS_LONGFORM_MIN` | `300` | longform threshold in characters |
 | `THINKS_HOLDOUT` | `20` | pairs held out for the blind check |
