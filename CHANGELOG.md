@@ -5,15 +5,23 @@ versions follow [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-18
+
 ### Added
 
 - `THINKS_NEVER_MARKS` declares marks the owner never types, with their
   stand-ins (`—:--,…:...,→:=>,«:",»:"`). `check_as_me` penalises a declared
   mark in every register regardless of its measured share, quoting it in
-  context and naming the stand-in; every brief asks for the stand-in. A measured finding
-  for the same mark is dropped so it is not charged twice.
+  context and naming the stand-in; every brief asks for the stand-in. A
+  measured finding for the same mark is dropped so it is not charged twice.
 - The ellipsis character `…` and the arrow `→` are measured with the other
   typographic marks. They take effect after the corpus is rebuilt.
+
+### Changed
+
+- The server's own Russian strings -- profile, briefs, tool descriptions,
+  findings and CLI help -- use straight quotes and a double hyphen instead of
+  guillemets and an em dash. Probe labels keep the marks they name.
 
 ## [0.2.0] — 2026-09-08
 
@@ -69,7 +77,8 @@ First release on npm: `build`, `code`, `profile`, `holdout`, `where` and the
 MCP server with `write_as_me`, `reply_as_me`, `rephrase_as_me`, `check_as_me`
 and `find_my_messages`.
 
-[Unreleased]: https://github.com/aimuzov/thinks-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aimuzov/thinks-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/aimuzov/thinks-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aimuzov/thinks-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/aimuzov/thinks-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/aimuzov/thinks-mcp/releases/tag/v0.1.0
