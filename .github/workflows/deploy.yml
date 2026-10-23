@@ -1,0 +1,63 @@
+name: Deploy
+
+# A merge into main only updates the release PR. Merging that PR cuts a
+# release, and the release goes out to the projects server. A manual run
+# deploys any release tag, e.g. to roll back.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to deploy, e.g. v1.2.0. Empty deploys the newest main.
+        required: false
+
+# One deploy at a time; a new one does not cancel a build already under way.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    outputs:
+      created: ${{ steps.release.outputs.created }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - id: release
+        uses: aimuzov-projects/infra-site-kit/release@v2
+
+  check:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    uses: ./.github/workflows/check.yml
+
+  # Skipped until the server is ready (key, clone in /srv, site in Caddy).
+  # Turned on by the repository variable `DEPLOY_ENABLED=true`.
+  deploy:
+    needs: [release, check]
+    # `!cancelled()` rather than `always()`: the job runs when release and check
+    # are skipped (a manual run), but a cancelled run does not deploy.
+    if: >-
+      !cancelled() && vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' || needs.check.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://thinks-mcp.aimuzov.online
+    steps:
+      - uses: aimuzov-projects/infra-site-kit/deploy@v2
+        with:
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          url: https://thinks-mcp.aimuzov.online/health
+          ref: ${{ needs.release.outputs.tag || inputs.tag }}

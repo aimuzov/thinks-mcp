@@ -1,9 +1,15 @@
-name: CI
+name: Check
 
+# On main the deploy workflow runs these checks before a release goes out, and
+# branches are checked through their PR. A separate run on push would repeat
+# the same commit.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   check:
