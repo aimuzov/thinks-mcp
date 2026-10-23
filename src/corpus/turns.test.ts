@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { iterateChats, resolveOwnerId } from './parse.js'
+import { chatsOf, iterateChats, resolveOwnerId } from './parse.js'
 import { collectSurnames, createSanitizer } from './sanitize.js'
 import { emptyStats } from './filter.js'
 import { buildTurns } from './turns.js'
@@ -11,7 +11,7 @@ function build() {
   const stats = emptyStats()
   const san = createSanitizer(collectSurnames(['Ivan Petrov', 'Sergey Volkov']))
   const turns: Turn[] = []
-  for (const chat of iterateChats(dump)) {
+  for (const chat of iterateChats(chatsOf(dump))) {
     turns.push(
       ...buildTurns(
         chat,
@@ -26,7 +26,7 @@ function build() {
 
 describe('resolveOwnerId', () => {
   it('reads the owner off Saved Messages', () => {
-    expect(resolveOwnerId(makeDump())).toBe(OWNER_ID)
+    expect(resolveOwnerId(chatsOf(makeDump()))).toBe(OWNER_ID)
   })
 })
 
