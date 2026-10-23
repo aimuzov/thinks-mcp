@@ -4,6 +4,13 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0](https://github.com/aimuzov/thinks-mcp/compare/v0.3.0...v0.4.0) (2026-10-23)
+
+
+### Features
+
+* serve thinks-mcp as a remote connector with Telegram login ([#2](https://github.com/aimuzov/thinks-mcp/issues/2)) ([e386bc8](https://github.com/aimuzov/thinks-mcp/commit/e386bc8c3c5d0da89147aaed615cc25bc9a8a7aa))
+
 ## [0.3.0] — 2026-09-18
 
 ### Added
