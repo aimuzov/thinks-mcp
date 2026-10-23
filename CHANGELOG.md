@@ -1,9 +1,8 @@
 # Changelog
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-versions follow [SemVer](https://semver.org/).
-
-## [Unreleased]
+Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
+writes the entries from conventional commits; earlier ones follow
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.3.0] — 2026-09-18
 
