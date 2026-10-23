@@ -1,0 +1,11 @@
+.git
+.claude
+.serena
+node_modules
+build
+data
+dump.json
+*.tgz
+.env
+**/*.test.ts
+src/testing

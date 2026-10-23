@@ -1,0 +1,43 @@
+# thinks-mcp on the projects server. Ports 80/443 belong to the shared Caddy from
+# aimuzov-projects/infra-server, which proxies the domain here over the `edge` network.
+
+name: thinks-mcp
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '5m'
+    max-file: '2'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: thinks-mcp
+    container_name: thinks-mcp
+    restart: unless-stopped
+    env_file: ../.env
+    volumes:
+      - data:/data
+    # A corpus build runs in a child process with its own heap cap
+    # (THINKS_BUILD_HEAP_MB); the limit here has to fit it plus the server.
+    mem_limit: ${THINKS_MEM_LIMIT:-3500m}
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - edge
+    logging: *logging
+
+volumes:
+  data:
+    name: thinks-mcp-data
+
+networks:
+  edge:
+    name: edge
+    external: true

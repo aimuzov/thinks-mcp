@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 import { ensureDataDir, loadConfig } from './config.js'
 import { buildCodeCorpus, formatCodeReport } from './code/build.js'
 import { buildCorpus, formatReport } from './corpus/build.js'
+import { serveHttp } from './http/app.js'
 import { serve } from './mcp/server.js'
 import { holdoutTurns } from './search/query.js'
 import { openDb } from './store/db.js'
@@ -14,6 +15,9 @@ import type { Register } from './corpus/types.js'
 const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозитории...>|profile [register]|holdout|where|--help]
 
   serve             запустить MCP-сервер на stdio (по умолчанию)
+  serve --http      запустить многопользовательский сервер с OAuth и кабинетом.
+                    Настраивается только окружением: PUBLIC_URL, AUTH_SECRET,
+                    TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_NAME, THINKS_DATA_DIR, PORT
   build <dump.json> собрать корпус и профиль из выгрузки Telegram
   code <пути...>    собрать корпус комментариев из git-репозиториев.
                     Авторство определяется по email -- задай THINKS_CODE_EMAILS
@@ -146,7 +150,8 @@ async function main() {
 
     case undefined:
     case 'serve':
-      await serve(cfg)
+      if (process.argv.includes('--http')) serveHttp()
+      else await serve(cfg)
       return
 
     case '--help':

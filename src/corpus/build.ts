@@ -33,6 +33,15 @@ export interface BuildReport {
   filtered: FilterStats
 }
 
+export interface BuildOptions {
+  /**
+   * Refuse the dump unless it is this account's own export. The hosted server
+   * sets it to the logged-in user, so nobody can upload someone else's
+   * correspondence and then talk to it.
+   */
+  expectOwnerId?: string
+}
+
 /**
  * Build the corpus, the indexes and the profile from a Telegram export.
  *
@@ -42,13 +51,19 @@ export interface BuildReport {
  */
 export function buildCorpus(
   cfg: Config,
-  log: (msg: string) => void = () => {}
+  log: (msg: string) => void = () => {},
+  opts: BuildOptions = {}
 ): BuildReport {
   log(`Читаю ${cfg.dumpPath}`)
   const dump = readDump(cfg.dumpPath)
 
   const ownerId = cfg.ownerId || resolveOwnerId(dump)
   log(`Владелец архива: ${ownerId}`)
+  if (opts.expectOwnerId && ownerId !== opts.expectOwnerId) {
+    throw new Error(
+      `Это выгрузка другого аккаунта: ${ownerId}, а не ${opts.expectOwnerId}`
+    )
+  }
 
   const names = new Set<string>()
   for (const chat of iterateChats(dump, cfg.chatStopList)) {

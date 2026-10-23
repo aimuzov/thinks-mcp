@@ -23,10 +23,13 @@ const { version: VERSION } = createRequire(import.meta.url)(
  * MCP config, and a machine that has not imported an archive yet should see a
  * working server that explains what to do, not a failed one.
  */
-export function createServer(cfg: Config): McpServer {
+export function createServer(
+  cfg: Config,
+  corpus: CorpusRef = new CorpusRef(cfg)
+): McpServer {
   ensureDataDir(cfg)
 
-  const ctx: ToolContext = { cfg, corpus: new CorpusRef(cfg) }
+  const ctx: ToolContext = { cfg, corpus }
   const server = new McpServer({ name: 'thinks-mcp', version: VERSION })
 
   registerWriteAsMe(server, ctx)
