@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import type { ParsedChat, ParsedMessage, TextEntity } from './types.js'
+import { JsonScanner } from './scanner.js'
 
 /** Raw shapes we care about in a Telegram JSON export. */
 interface RawMessage {
@@ -29,35 +29,101 @@ interface RawDump {
   left_chats?: { list?: RawChat[] }
 }
 
-/**
- * Read and parse the whole export. The 411 MB file parses in ~2s at ~2.3 GB RSS,
- * so a streaming parser buys nothing; the npm script raises the heap instead.
- */
-export function readDump(dumpPath: string): RawDump {
-  return JSON.parse(readFileSync(dumpPath, 'utf8')) as RawDump
+/** The export's chats, `chats.list` then `left_chats.list`. Re-iterable. */
+export type Dump = Iterable<RawChat>
+
+/** Chats of an export already in memory, e.g. a test fixture. */
+export function chatsOf(dump: RawDump): RawChat[] {
+  return [...(dump.chats?.list ?? []), ...(dump.left_chats?.list ?? [])]
 }
 
-function allChats(dump: RawDump): RawChat[] {
-  return [...(dump.chats?.list ?? []), ...(dump.left_chats?.list ?? [])]
+/**
+ * Open the export for streaming. Each pass reads the file anew and holds one
+ * chat at a time, trimmed to the fields below: parsing the 411 MB file whole
+ * took ~2.3 GB RSS, which a small VPS does not have.
+ */
+export function readDump(dumpPath: string): Dump {
+  return { [Symbol.iterator]: () => streamChats(dumpPath) }
+}
+
+/**
+ * Chats in file order. Telegram Desktop writes `chats` before `left_chats`,
+ * which is the order `chatsOf` gives too.
+ */
+export function* streamChats(
+  dumpPath: string,
+  chunkSize?: number
+): Generator<RawChat> {
+  const s = new JsonScanner(dumpPath, chunkSize)
+  try {
+    for (const section of s.entries()) {
+      if (section !== 'chats' && section !== 'left_chats') {
+        s.skip()
+        continue
+      }
+      for (const key of s.entries()) {
+        if (key !== 'list') {
+          s.skip()
+          continue
+        }
+        for (const _ of s.items()) yield readChat(s)
+      }
+    }
+  } finally {
+    s.close()
+  }
+}
+
+function readChat(s: JsonScanner): RawChat {
+  const chat: RawChat = {}
+  for (const key of s.entries()) {
+    if (key === 'id') chat.id = s.value() as number
+    else if (key === 'name') chat.name = s.value() as string | null
+    else if (key === 'type') chat.type = s.value() as string
+    else if (key === 'messages') {
+      chat.messages = []
+      for (const _ of s.items()) {
+        chat.messages.push(trimMessage(s.value() as RawMessage))
+      }
+    } else s.skip()
+  }
+  return chat
+}
+
+/** Keep only what `iterateChats` and `resolveOwnerId` read. */
+function trimMessage(m: RawMessage): RawMessage {
+  return {
+    id: m.id,
+    type: m.type,
+    date_unixtime: m.date_unixtime,
+    from: m.from,
+    from_id: m.from_id,
+    text_entities: m.text_entities?.map(e => ({
+      type: e?.type,
+      text: e?.text,
+    })),
+    forwarded_from: m.forwarded_from,
+    saved_from: m.saved_from,
+    via_bot: m.via_bot,
+    reply_to_message_id: m.reply_to_message_id,
+  }
 }
 
 /**
  * Figure out whose export this is. Saved Messages only ever contains the owner,
  * which is the strongest signal; otherwise fall back to the most prolific
  * sender, who in a personal archive is the owner by a wide margin.
+ *
+ * One pass: the counts are gathered on the way to Saved Messages, so a dump
+ * without it is not read twice.
  */
-export function resolveOwnerId(dump: RawDump): string {
-  const chats = allChats(dump)
-
-  for (const chat of chats) {
-    if (chat.type !== 'saved_messages') continue
-    for (const m of chat.messages ?? []) {
-      if (m.from_id) return m.from_id
-    }
-  }
-
+export function resolveOwnerId(chats: Dump): string {
   const counts = new Map<string, number>()
   for (const chat of chats) {
+    if (chat.type === 'saved_messages') {
+      const own = chat.messages?.find(m => m.from_id)
+      if (own?.from_id) return own.from_id
+    }
     for (const m of chat.messages ?? []) {
       if (!m.from_id) continue
       counts.set(m.from_id, (counts.get(m.from_id) ?? 0) + 1)
@@ -111,12 +177,12 @@ function registerOf(chatType: string): 'dm' | 'group' {
  * background corpus the lexicon is scored against.
  */
 export function* iterateChats(
-  dump: RawDump,
+  chats: Dump,
   stopList: string[] = []
 ): Generator<ParsedChat> {
   const blocked = new Set(stopList.map(s => s.toLowerCase()))
 
-  for (const chat of allChats(dump)) {
+  for (const chat of chats) {
     const name = chat.name ?? ''
     if (blocked.has(name.toLowerCase())) continue
 
