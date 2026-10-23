@@ -29,7 +29,7 @@ export interface HttpConfig {
 }
 
 const DEFAULT_PORT = 8080
-const DEFAULT_MAX_UPLOAD_MB = 2048
+const DEFAULT_MAX_UPLOAD_MB = 1024
 
 /** Claude's OAuth callbacks; loopback is allowed on top of these for Claude Code. */
 const CLAUDE_CALLBACKS = [

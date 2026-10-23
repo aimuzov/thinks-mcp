@@ -21,8 +21,9 @@ services:
     volumes:
       - data:/data
     # A corpus build runs in a child process with its own heap cap
-    # (THINKS_BUILD_HEAP_MB); the limit here has to fit it plus the server.
-    mem_limit: ${THINKS_MEM_LIMIT:-3500m}
+    # (THINKS_BUILD_HEAP_MB, 1 GB); the limit here has to fit it plus the
+    # server. The projects server has 2 GB for every site on it.
+    mem_limit: ${THINKS_MEM_LIMIT:-1280m}
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/health']
       interval: 30s

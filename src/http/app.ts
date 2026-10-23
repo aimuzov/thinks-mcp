@@ -275,7 +275,7 @@ export function serveHttp(): void {
 
   const users = new Users(cfg.dataDir)
   const heapMb =
-    Number.parseInt(process.env.THINKS_BUILD_HEAP_MB ?? '', 10) || 3072
+    Number.parseInt(process.env.THINKS_BUILD_HEAP_MB ?? '', 10) || 1024
   const builds = new Builds(users, cfg.dataDir, childRunner(heapMb))
   builds.recover(users.list())
 
