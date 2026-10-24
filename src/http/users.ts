@@ -17,12 +17,15 @@ export interface UserSettings {
   /** Same format as THINKS_CHAT_STOPLIST: chat names, comma-separated. */
   chatStopList: string
   recentYears: number
+  /** Claude talks to the user in the user's voice. Off by default. */
+  voice: boolean
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
   neverMarks: '',
   chatStopList: '',
   recentYears: 3,
+  voice: false,
 }
 
 /** How many users keep their corpus open between requests. */
@@ -81,6 +84,7 @@ export class Users {
       THINKS_NEVER_MARKS: s.neverMarks,
       THINKS_CHAT_STOPLIST: s.chatStopList,
       THINKS_RECENT_YEARS: String(s.recentYears),
+      THINKS_VOICE: s.voice ? '1' : '',
     })
   }
 

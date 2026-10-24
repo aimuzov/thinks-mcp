@@ -292,3 +292,54 @@ describe('account', () => {
     expect(users.hasCorpus(OWNER)).toBe(false)
   })
 })
+
+describe('voice mode', () => {
+  it('sends the profile as instructions only while the switch is on', async () => {
+    seedCorpus(OWNER)
+    const token = (await authorize(OWNER)).tokens!.access_token
+
+    expect((await mcpClient(token)).getInstructions()).toBeUndefined()
+
+    users.saveSettings(OWNER, { ...users.settings(OWNER), voice: true })
+    const instructions = (await mcpClient(token)).getInstructions()
+    expect(instructions).toContain('его же голосом')
+    expect(instructions).toContain('# Как я пишу')
+  })
+
+  it('offers the same text as a prompt for clients that drop instructions', async () => {
+    seedCorpus(OWNER)
+    const client = await mcpClient(
+      (await authorize(OWNER)).tokens!.access_token
+    )
+    const prompt = await client.getPrompt({ name: 'talk-like-me' })
+    const text = (prompt.messages[0]!.content as { text: string }).text
+    expect(text).toContain('# Как я пишу')
+  })
+
+  it('saves the switch from the account form', async () => {
+    const url = new URL(`${base}/account/login`)
+    for (const [k, v] of Object.entries(telegram(OWNER))) {
+      url.searchParams.set(k, v)
+    }
+    const login = await fetch(url, { redirect: 'manual' })
+    const cookie = login.headers.get('set-cookie')!.split(';')[0]!
+
+    const save = (body: string) =>
+      fetch(`${base}/account/settings`, {
+        method: 'POST',
+        headers: {
+          cookie,
+          origin: base,
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body,
+        redirect: 'manual',
+      })
+
+    await save('neverMarks=&chatStopList=&recentYears=3&voice=1')
+    expect(users.settings(OWNER).voice).toBe(true)
+    // An unchecked box is simply absent from the form.
+    await save('neverMarks=&chatStopList=&recentYears=3')
+    expect(users.settings(OWNER).voice).toBe(false)
+  })
+})

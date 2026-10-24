@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ensureDataDir, type Config } from '../config.js'
 import { CorpusRef, type ToolContext } from './context.js'
 import { registerPrompts } from './prompts.js'
+import { voiceInstructions } from './voice.js'
 import { registerResources } from './resources.js'
 import { registerCheckAsMe } from './tools/checkAsMe.js'
 import { registerFindMyMessages } from './tools/findMyMessages.js'
@@ -30,7 +31,13 @@ export function createServer(
   ensureDataDir(cfg)
 
   const ctx: ToolContext = { cfg, corpus }
-  const server = new McpServer({ name: 'thinks-mcp', version: VERSION })
+  // Instructions are read once, when the client connects: a corpus built or a
+  // switch flipped later takes effect in the next conversation.
+  const profile = cfg.voice ? corpus.get()?.profile : undefined
+  const server = new McpServer(
+    { name: 'thinks-mcp', version: VERSION },
+    profile ? { instructions: voiceInstructions(profile) } : {}
+  )
 
   registerWriteAsMe(server, ctx)
   registerReplyAsMe(server, ctx)

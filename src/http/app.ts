@@ -223,6 +223,7 @@ export function createApp({ cfg, store, users, builds, tokens }: AppDeps) {
         chatStopList: String(req.body.chatStopList ?? '').trim(),
         recentYears:
           years >= 1 && years <= 20 ? years : DEFAULT_SETTINGS.recentYears,
+        voice: req.body.voice === '1',
       })
       res.redirect(302, '/account')
     }
