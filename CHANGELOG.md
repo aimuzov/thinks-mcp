@@ -4,6 +4,13 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0](https://github.com/aimuzov/thinks-mcp/compare/v0.4.0...v0.5.0) (2026-10-24)
+
+
+### Features
+
+* let Claude talk to the owner in the owner's voice ([#4](https://github.com/aimuzov/thinks-mcp/issues/4)) ([2048e82](https://github.com/aimuzov/thinks-mcp/commit/2048e8231b18fc2a1ac9b7f922a1260c37c583b7))
+
 ## [0.4.0](https://github.com/aimuzov/thinks-mcp/compare/v0.3.0...v0.4.0) (2026-10-23)
 
 
