@@ -50,6 +50,11 @@ export interface Config {
    * tells that apart from a habit -- only the owner can.
    */
   neverMarks: NeverMark[]
+  /**
+   * Ask the model to talk to the owner in the owner's voice, not only to write
+   * on their behalf. Sent as the server's instructions; see mcp/voice.ts.
+   */
+  voice: boolean
 }
 
 /** A mark the owner never types, with what they type in its place. */
@@ -104,6 +109,7 @@ export function loadConfig(env: Env = process.env): Config {
     codeHandwrittenUntil:
       Number.parseInt(env.THINKS_CODE_HANDWRITTEN_UNTIL ?? '', 10) || 0,
     neverMarks: parseNeverMarks(env.THINKS_NEVER_MARKS),
+    voice: env.THINKS_VOICE?.trim() === '1',
   }
 }
 

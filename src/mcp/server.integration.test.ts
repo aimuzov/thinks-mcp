@@ -29,6 +29,7 @@ function seededConfig(): Config {
     recentYears: 3,
     codeHandwrittenUntil: 0,
     neverMarks: [],
+    voice: false,
   }
   buildCorpus(cfg)
   return cfg
@@ -145,6 +146,7 @@ describe('MCP server (end to end)', () => {
       'as-me',
       'comment-as-me',
       'reply-as-me',
+      'talk-like-me',
     ])
   })
 

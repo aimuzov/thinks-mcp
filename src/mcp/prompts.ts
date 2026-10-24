@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import type { ToolContext } from './context.js'
+import { CORPUS_MISSING, type ToolContext } from './context.js'
+import { voiceInstructions } from './voice.js'
 
 /**
  * Prompts wrap the tools as slash commands.
@@ -9,7 +10,32 @@ import type { ToolContext } from './context.js'
  * conversation itself, so the instruction to obey the brief arrives before the
  * model starts composing rather than as data it may skim.
  */
-export function registerPrompts(server: McpServer, _ctx: ToolContext) {
+export function registerPrompts(server: McpServer, ctx: ToolContext) {
+  // The same text voice mode sends as instructions, for clients that never
+  // show instructions to the model.
+  server.registerPrompt(
+    'talk-like-me',
+    {
+      title: 'Говори как я',
+      description:
+        'Весь этот разговор Claude отвечает тебе твоим же голосом, по профилю из архива.',
+    },
+    () => {
+      const corpus = ctx.corpus.get()
+      return {
+        messages: [
+          {
+            role: 'user' as const,
+            content: {
+              type: 'text' as const,
+              text: corpus ? voiceInstructions(corpus.profile) : CORPUS_MISSING,
+            },
+          },
+        ],
+      }
+    }
+  )
+
   server.registerPrompt(
     'as-me',
     {

@@ -145,8 +145,10 @@ ${busy ? '<script>setTimeout(() => location.reload(), 5000)</script>' : ''}
 <input type="text" name="chatStopList" value="${escapeHtml(settings.chatStopList)}"></label></p>
 <p><label>Сколько последних лет считать "как я пишу сейчас"<br>
 <input type="number" name="recentYears" min="1" max="20" value="${settings.recentYears}"></label></p>
+<p><label><input type="checkbox" name="voice" value="1" ${settings.voice ? 'checked' : ''}> Claude говорит со мной моим голосом</label></p>
 <p><button type="submit">Сохранить</button></p>
-<p class="muted">Знаки применяются сразу. Список чатов и годы -- после следующей сборки.</p>
+<p class="muted">Знаки применяются сразу, голос -- с нового чата. Список чатов и годы -- после следующей сборки.</p>
+<p class="muted">Если в новом чате Claude всё равно пишет по-своему, значит клиент не передаёт ему настройки коннектора. Тогда выбери в чате промпт "Говори как я" из меню коннектора.</p>
 </form>
 </section>
 
