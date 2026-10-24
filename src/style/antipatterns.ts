@@ -1,11 +1,11 @@
-import type { Turn } from '../corpus/types.js'
+import type { Turn } from '#thinks/corpus/types'
 
 export interface AntiPattern {
-  label: string
-  /** How many messages out of the corpus contain it. */
-  hits: number
-  /** Share of messages, in percent. */
-  share: number
+	label: string
+	/** How many messages out of the corpus contain it. */
+	hits: number
+	/** Share of messages, in percent. */
+	share: number
 }
 
 /**
@@ -18,28 +18,27 @@ export interface AntiPattern {
  * characters, so /\bоднако\b/ matches nothing at all — a silent failure that
  * reported every clerical probe as zero hits.
  */
-export const word = (body: string) =>
-  new RegExp(`(?<!\\p{L})(?:${body})(?!\\p{L})`, 'iu')
+export const word = (body: string) => new RegExp(`(?<!\\p{L})(?:${body})(?!\\p{L})`, 'iu')
 
 export interface Probe {
-  label: string
-  test: RegExp
+	label: string
+	test: RegExp
 }
 
 const PROBES: Probe[] = [
-  { label: 'однако', test: word('однако') },
-  { label: 'таким образом', test: /таким образом/i },
-  { label: 'является', test: word('являетс[яь]') },
-  { label: 'данный / данная', test: word('данн(?:ый|ая|ое|ые|ого|ой)') },
-  { label: 'в рамках', test: /в рамках/i },
-  { label: 'в связи с', test: /в связи с/i },
-  { label: 'осуществлять', test: /осуществл/i },
-  { label: 'следует отметить', test: /(следует|необходимо) отметить/i },
-  { label: 'списки через дефис', test: /^\s*[-–—]\s+\S/m },
-  { label: 'нумерованные списки', test: /^\s*\d[.)]\s+\S/m },
-  { label: 'буллеты •', test: /^\s*•/m },
-  { label: 'markdown-жирный **', test: /\*\*/ },
-  { label: 'эмодзи 👍', test: /👍/u },
+	{ label: 'однако', test: word('однако') },
+	{ label: 'таким образом', test: /таким образом/i },
+	{ label: 'является', test: word('являетс[яь]') },
+	{ label: 'данный / данная', test: word('данн(?:ый|ая|ое|ые|ого|ой)') },
+	{ label: 'в рамках', test: /в рамках/i },
+	{ label: 'в связи с', test: /в связи с/i },
+	{ label: 'осуществлять', test: /осуществл/i },
+	{ label: 'следует отметить', test: /(следует|необходимо) отметить/i },
+	{ label: 'списки через дефис', test: /^\s*[-–—]\s+\S/m },
+	{ label: 'нумерованные списки', test: /^\s*\d[.)]\s+\S/m },
+	{ label: 'буллеты •', test: /^\s*•/m },
+	{ label: 'markdown-жирный **', test: /\*\*/ },
+	{ label: 'эмодзи 👍', test: /👍/u },
 ]
 
 /**
@@ -52,12 +51,12 @@ const PROBES: Probe[] = [
  * count as foreign.
  */
 export const FOREIGN_TYPOGRAPHY: Probe[] = [
-  { label: 'кавычки-ёлочки «»', test: /[«»]/u },
-  { label: 'длинное тире —', test: /—/u },
-  { label: 'короткое тире –', test: /–/u },
-  { label: 'кавычки-лапки “”', test: /[“”]/u },
-  { label: 'многоточие одним знаком …', test: /…/u },
-  { label: 'стрелка →', test: /→/u },
+	{ label: 'кавычки-ёлочки «»', test: /[«»]/u },
+	{ label: 'длинное тире —', test: /—/u },
+	{ label: 'короткое тире –', test: /–/u },
+	{ label: 'кавычки-лапки “”', test: /[“”]/u },
+	{ label: 'многоточие одним знаком …', test: /…/u },
+	{ label: 'стрелка →', test: /→/u },
 ]
 
 /**
@@ -69,8 +68,8 @@ export const FOREIGN_TYPOGRAPHY: Probe[] = [
  * register: in chat it is nobody's, in code it can be how they write a dash.
  */
 export const DOUBLE_HYPHEN: Probe = {
-  label: 'двойной дефис --',
-  test: /(?<![-\p{L}\p{N}/])--(?![-\p{L}\p{N}])/u,
+	label: 'двойной дефис --',
+	test: /(?<![-\p{L}\p{N}/])--(?![-\p{L}\p{N}])/u,
 }
 
 export const TYPOGRAPHY: Probe[] = [...FOREIGN_TYPOGRAPHY, DOUBLE_HYPHEN]
@@ -93,43 +92,38 @@ const MARKDOWN_LABELS = ['markdown-жирный **']
  * Undefined when none of them was measured: a profile built before the probe
  * existed must not be read as "never does this".
  */
-function habitShare(
-  patterns: AntiPattern[],
-  labels: string[]
-): number | undefined {
-  const found = patterns.filter(a => labels.includes(a.label))
-  if (!found.length) return undefined
-  return Math.max(...found.map(a => a.share))
+function habitShare(patterns: AntiPattern[], labels: string[]): number | undefined {
+	const found = patterns.filter((a) => labels.includes(a.label))
+	if (!found.length) return undefined
+	return Math.max(...found.map((a) => a.share))
 }
 
-export const listShare = (patterns: AntiPattern[]) =>
-  habitShare(patterns, LIST_LABELS)
+export const listShare = (patterns: AntiPattern[]) => habitShare(patterns, LIST_LABELS)
 
-export const markdownShare = (patterns: AntiPattern[]) =>
-  habitShare(patterns, MARKDOWN_LABELS)
+export const markdownShare = (patterns: AntiPattern[]) => habitShare(patterns, MARKDOWN_LABELS)
 
 /** Share of the given texts, in percent, matching each probe. */
 function countProbes(probes: Probe[], texts: string[]): AntiPattern[] {
-  const total = texts.length || 1
+	const total = texts.length || 1
 
-  return probes
-    .map(probe => {
-      let hits = 0
-      for (const text of texts) if (probe.test.test(text)) hits++
-      return {
-        label: probe.label,
-        hits,
-        share: Math.round((hits / total) * 100_000) / 1000,
-      }
-    })
-    .sort((a, b) => a.share - b.share)
+	return probes
+		.map((probe) => {
+			let hits = 0
+			for (const text of texts) if (probe.test.test(text)) hits++
+			return {
+				label: probe.label,
+				hits,
+				share: Math.round((hits / total) * 100_000) / 1000,
+			}
+		})
+		.sort((a, b) => a.share - b.share)
 }
 
 export function findAntiPatterns(turns: Turn[]): AntiPattern[] {
-  return countProbes(
-    PROBES,
-    turns.flatMap(t => t.parts)
-  )
+	return countProbes(
+		PROBES,
+		turns.flatMap((t) => t.parts),
+	)
 }
 
 /**
@@ -139,7 +133,7 @@ export function findAntiPatterns(turns: Turn[]): AntiPattern[] {
  * chat messages on one side, comment lines on the other.
  */
 export function measureTypography(texts: string[]): AntiPattern[] {
-  return countProbes(TYPOGRAPHY, texts)
+	return countProbes(TYPOGRAPHY, texts)
 }
 
 /**
@@ -148,9 +142,6 @@ export function measureTypography(texts: string[]): AntiPattern[] {
  * A profile built before the probe existed must not be read as "never does
  * this" -- same reason `habitShare` returns undefined.
  */
-export function shareOf(
-  patterns: AntiPattern[] | undefined,
-  label: string
-): number | undefined {
-  return patterns?.find(a => a.label === label)?.share
+export function shareOf(patterns: AntiPattern[] | undefined, label: string): number | undefined {
+	return patterns?.find((a) => a.label === label)?.share
 }

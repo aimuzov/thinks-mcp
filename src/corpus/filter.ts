@@ -1,26 +1,20 @@
-import type { ParsedMessage } from './types.js'
+import type { ParsedMessage } from './types.ts'
 
 /** Why a message did not make it into the corpus. `null` means it was kept. */
-export type RejectReason =
-  | 'not-owner'
-  | 'empty'
-  | 'forwarded'
-  | 'via-bot'
-  | 'structured'
-  | 'link-spam'
+export type RejectReason = 'not-owner' | 'empty' | 'forwarded' | 'via-bot' | 'structured' | 'link-spam'
 
 export type FilterStats = Record<RejectReason | 'kept', number>
 
 export function emptyStats(): FilterStats {
-  return {
-    'not-owner': 0,
-    empty: 0,
-    forwarded: 0,
-    'via-bot': 0,
-    structured: 0,
-    'link-spam': 0,
-    kept: 0,
-  }
+	return {
+		'not-owner': 0,
+		empty: 0,
+		forwarded: 0,
+		'via-bot': 0,
+		structured: 0,
+		'link-spam': 0,
+		kept: 0,
+	}
 }
 
 const STRUCTURAL_CHARS = new Set(['{', '}', '[', ']', '<', '>', ';', '='])
@@ -36,27 +30,26 @@ const MAX_LINKS = 3
  * longform register would be trained mostly on other people's writing.
  */
 export function reject(m: ParsedMessage, ownerId: string): RejectReason | null {
-  if (m.fromId !== ownerId) return 'not-owner'
-  if (m.isForwarded) return 'forwarded'
-  if (m.isViaBot) return 'via-bot'
+	if (m.fromId !== ownerId) return 'not-owner'
+	if (m.isForwarded) return 'forwarded'
+	if (m.isViaBot) return 'via-bot'
 
-  const text = m.text.trim()
-  if (!text) return 'empty'
+	const text = m.text.trim()
+	if (!text) return 'empty'
 
-  if (text.startsWith('{') || text.startsWith('[') || text.startsWith('<')) {
-    return 'structured'
-  }
+	if (text.startsWith('{') || text.startsWith('[') || text.startsWith('<')) {
+		return 'structured'
+	}
 
-  let structural = 0
-  for (const ch of text) if (STRUCTURAL_CHARS.has(ch)) structural++
-  if (structural / text.length > MAX_STRUCTURAL_SHARE) return 'structured'
+	let structural = 0
+	for (const ch of text) if (STRUCTURAL_CHARS.has(ch)) structural++
+	if (structural / text.length > MAX_STRUCTURAL_SHARE) return 'structured'
 
-  let links = 0
-  for (const e of m.entities)
-    if (e.type === 'link' || e.type === 'text_link') links++
-  if (links > MAX_LINKS) return 'link-spam'
+	let links = 0
+	for (const e of m.entities) if (e.type === 'link' || e.type === 'text_link') links++
+	if (links > MAX_LINKS) return 'link-spam'
 
-  return null
+	return null
 }
 
 /**
@@ -64,6 +57,6 @@ export function reject(m: ParsedMessage, ownerId: string): RejectReason | null {
  * placeholders and punctuation ("<ссылка>", ")") teaches no style.
  */
 export function hasSubstance(sanitized: string): boolean {
-  const withoutPlaceholders = sanitized.replace(/<[^>]{1,12}>|@собеседник/g, '')
-  return /\p{L}/u.test(withoutPlaceholders)
+	const withoutPlaceholders = sanitized.replace(/<[^>]{1,12}>|@собеседник/g, '')
+	return /\p{L}/u.test(withoutPlaceholders)
 }

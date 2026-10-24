@@ -1,7 +1,8 @@
-import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { CORPUS_MISSING, type ToolContext } from './context.js'
-import { voiceInstructions } from './voice.js'
+import { z } from 'zod'
+
+import { CORPUS_MISSING, type ToolContext } from './context.ts'
+import { voiceInstructions } from './voice.ts'
 
 /**
  * Prompts wrap the tools as slash commands.
@@ -11,123 +12,119 @@ import { voiceInstructions } from './voice.js'
  * model starts composing rather than as data it may skim.
  */
 export function registerPrompts(server: McpServer, ctx: ToolContext) {
-  // The same text voice mode sends as instructions, for clients that never
-  // show instructions to the model.
-  server.registerPrompt(
-    'talk-like-me',
-    {
-      title: 'Говори как я',
-      description:
-        'Весь этот разговор Claude отвечает тебе твоим же голосом, по профилю из архива.',
-    },
-    () => {
-      const corpus = ctx.corpus.get()
-      return {
-        messages: [
-          {
-            role: 'user' as const,
-            content: {
-              type: 'text' as const,
-              text: corpus ? voiceInstructions(corpus.profile) : CORPUS_MISSING,
-            },
-          },
-        ],
-      }
-    }
-  )
+	// The same text voice mode sends as instructions, for clients that never
+	// show instructions to the model.
+	server.registerPrompt(
+		'talk-like-me',
+		{
+			title: 'Говори как я',
+			description: 'Весь этот разговор Claude отвечает тебе твоим же голосом, по профилю из архива.',
+		},
+		() => {
+			const corpus = ctx.corpus.get()
+			return {
+				messages: [
+					{
+						role: 'user' as const,
+						content: {
+							type: 'text' as const,
+							text: corpus ? voiceInstructions(corpus.profile) : CORPUS_MISSING,
+						},
+					},
+				],
+			}
+		},
+	)
 
-  server.registerPrompt(
-    'as-me',
-    {
-      title: 'Написать как я',
-      description: 'Сочинить текст голосом владельца архива.',
-      argsSchema: {
-        task: z.string().describe('Что нужно написать.'),
-      },
-    },
-    ({ task }) => ({
-      messages: [
-        {
-          role: 'user' as const,
-          content: {
-            type: 'text' as const,
-            text:
-              `Вызови write_as_me с этим заданием: ${task}\n\n` +
-              'Дальше строго следуй полученному брифу: профилю, ограничениям ' +
-              'и формату ответа. Затем прогони результат через check_as_me и, ' +
-              'если оценка ниже 85, перепиши по замечаниям и проверь снова. ' +
-              'Покажи только итоговый текст.',
-          },
-        },
-      ],
-    })
-  )
+	server.registerPrompt(
+		'as-me',
+		{
+			title: 'Написать как я',
+			description: 'Сочинить текст голосом владельца архива.',
+			argsSchema: {
+				task: z.string().describe('Что нужно написать.'),
+			},
+		},
+		({ task }) => ({
+			messages: [
+				{
+					role: 'user' as const,
+					content: {
+						type: 'text' as const,
+						text:
+							`Вызови write_as_me с этим заданием: ${task}\n\n` +
+							'Дальше строго следуй полученному брифу: профилю, ограничениям ' +
+							'и формату ответа. Затем прогони результат через check_as_me и, ' +
+							'если оценка ниже 85, перепиши по замечаниям и проверь снова. ' +
+							'Покажи только итоговый текст.',
+					},
+				},
+			],
+		}),
+	)
 
-  server.registerPrompt(
-    'reply-as-me',
-    {
-      title: 'Ответить как я',
-      description: 'Ответить на входящее сообщение голосом владельца архива.',
-      argsSchema: {
-        incoming: z.string().describe('Сообщение, на которое нужно ответить.'),
-        hint: z.string().optional().describe('Что по смыслу ответить.'),
-      },
-    },
-    ({ incoming, hint }) => ({
-      messages: [
-        {
-          role: 'user' as const,
-          content: {
-            type: 'text' as const,
-            text:
-              `Вызови reply_as_me. Входящее сообщение: ${incoming}` +
-              (hint ? `\nСмысл ответа: ${hint}` : '') +
-              '\n\nДальше строго следуй полученному брифу. Затем прогони ответ ' +
-              'через check_as_me и, если оценка ниже 85, перепиши по ' +
-              'замечаниям. Покажи только итоговый ответ, готовый к отправке.',
-          },
-        },
-      ],
-    })
-  )
+	server.registerPrompt(
+		'reply-as-me',
+		{
+			title: 'Ответить как я',
+			description: 'Ответить на входящее сообщение голосом владельца архива.',
+			argsSchema: {
+				incoming: z.string().describe('Сообщение, на которое нужно ответить.'),
+				hint: z.string().optional().describe('Что по смыслу ответить.'),
+			},
+		},
+		({ incoming, hint }) => ({
+			messages: [
+				{
+					role: 'user' as const,
+					content: {
+						type: 'text' as const,
+						text:
+							`Вызови reply_as_me. Входящее сообщение: ${incoming}` +
+							(hint ? `\nСмысл ответа: ${hint}` : '') +
+							'\n\nДальше строго следуй полученному брифу. Затем прогони ответ ' +
+							'через check_as_me и, если оценка ниже 85, перепиши по ' +
+							'замечаниям. Покажи только итоговый ответ, готовый к отправке.',
+					},
+				},
+			],
+		}),
+	)
 
-  server.registerPrompt(
-    'comment-as-me',
-    {
-      title: 'Прокомментировать как я',
-      description: 'Написать комментарий к коду голосом владельца архива.',
-      argsSchema: {
-        code: z.string().describe('Код, который нужно прокомментировать.'),
-        kind: z
-          .string()
-          .optional()
-          .describe('jsdoc -- докблок, иначе инлайн-комментарий.'),
-      },
-    },
-    ({ code, kind }) => {
-      const register = kind === 'jsdoc' ? 'jsdoc' : 'code'
-      return {
-        messages: [
-          {
-            role: 'user' as const,
-            content: {
-              type: 'text' as const,
-              text:
-                `Вызови write_as_me с register: "${register}" и объясни в brief, ` +
-                `что комментируешь этот код:\n\n${code}\n\n` +
-                'Дальше строго следуй полученному брифу. Комментарий должен ' +
-                'отвечать на "почему так", а не пересказывать код: если ' +
-                'причина не видна и подтвердить её нечем -- напиши только ' +
-                'проверяемый факт либо TODO с честной формулировкой незнания.\n\n' +
-                `Затем прогони результат через check_as_me с register: ` +
-                `"${register}" и обязательно передай тот же код параметром ` +
-                '`code` -- без него проверка не увидит пересказ. Оценка ниже ' +
-                '85 -- перепиши по замечаниям и проверь снова. Покажи только ' +
-                'готовый комментарий.',
-            },
-          },
-        ],
-      }
-    }
-  )
+	server.registerPrompt(
+		'comment-as-me',
+		{
+			title: 'Прокомментировать как я',
+			description: 'Написать комментарий к коду голосом владельца архива.',
+			argsSchema: {
+				code: z.string().describe('Код, который нужно прокомментировать.'),
+				kind: z.string().optional().describe('jsdoc -- докблок, иначе инлайн-комментарий.'),
+			},
+		},
+		({ code, kind }) => {
+			const register = kind === 'jsdoc' ? 'jsdoc' : 'code'
+			return {
+				messages: [
+					{
+						role: 'user' as const,
+						content: {
+							type: 'text' as const,
+							text:
+								`Вызови write_as_me с register: "${register}" и объясни в brief, ` +
+								`что комментируешь этот код:\n\n${code}\n\n` +
+								'Дальше строго следуй полученному брифу. Комментарий должен ' +
+								'отвечать на "почему так", а не пересказывать код: если ' +
+								'причина не видна и подтвердить её нечем -- напиши только ' +
+								'проверяемый факт либо TODO с честной формулировкой незнания.\n\n' +
+								`Затем прогони результат через check_as_me с register: ` +
+								`"${register}" и обязательно передай тот же код параметром ` +
+								'`code` -- без него проверка не увидит пересказ. Оценка ниже ' +
+								'85 -- перепиши по замечаниям и проверь снова. Покажи только ' +
+								'готовый комментарий.',
+						},
+					},
+				],
+			}
+		},
+	)
 }

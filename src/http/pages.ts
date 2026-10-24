@@ -1,15 +1,9 @@
-import type { HttpConfig } from './config.js'
-import type { BuildStatus } from './builds.js'
-import type { UserSettings } from './users.js'
+import type { BuildStatus } from './builds.ts'
+import type { HttpConfig } from './config.ts'
+import type { UserSettings } from './users.ts'
 
 export function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
-        c
-      ]!
-  )
+	return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 }
 
 const STYLE = `
@@ -26,7 +20,7 @@ const STYLE = `
 `
 
 function page(title: string, body: string): string {
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+	return `<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)}</title><style>${STYLE}</style></head>
 <body>${body}</body></html>`
@@ -37,88 +31,88 @@ function page(title: string, body: string): string {
  * plain link goes to the same callback and the server logs in the dev user.
  */
 function loginButton(cfg: HttpConfig, authUrl: string): string {
-  if (cfg.devUserId) {
-    const url = new URL(authUrl)
-    url.searchParams.set('dev', '1')
-    return `<p><a href="${escapeHtml(url.href)}"><button type="button">Войти как ${escapeHtml(cfg.devUserId)} (dev)</button></a></p>`
-  }
-  return `<script async src="https://telegram.org/js/telegram-widget.js?22"
+	if (cfg.devUserId) {
+		const url = new URL(authUrl)
+		url.searchParams.set('dev', '1')
+		return `<p><a href="${escapeHtml(url.href)}"><button type="button">Войти как ${escapeHtml(cfg.devUserId)} (dev)</button></a></p>`
+	}
+	return `<script async src="https://telegram.org/js/telegram-widget.js?22"
     data-telegram-login="${escapeHtml(cfg.telegramBotName)}" data-size="large"
     data-auth-url="${escapeHtml(authUrl)}"></script>`
 }
 
 export function loginPage(
-  cfg: HttpConfig,
-  opts: { authUrl: string; clientName: string; redirectHost: string }
+	cfg: HttpConfig,
+	opts: { authUrl: string; clientName: string; redirectHost: string },
 ): string {
-  const client = opts.clientName
-    ? `${escapeHtml(opts.clientName)} (${escapeHtml(opts.redirectHost)})`
-    : escapeHtml(opts.redirectHost)
-  return page(
-    'Вход в thinks',
-    `<h1>Подключение thinks</h1>
+	const client = opts.clientName
+		? `${escapeHtml(opts.clientName)} (${escapeHtml(opts.redirectHost)})`
+		: escapeHtml(opts.redirectHost)
+	return page(
+		'Вход в thinks',
+		`<h1>Подключение thinks</h1>
 <p>${client} просит доступ к твоему корпусу: стиль-профилю и сообщениям, по которым он пишет твоим голосом.</p>
 <p>Войди через Telegram, чтобы разрешить.</p>
 ${loginButton(cfg, opts.authUrl)}
-<p class="muted">Если ты не начинал подключение сам, просто закрой страницу.</p>`
-  )
+<p class="muted">Если ты не начинал подключение сам, просто закрой страницу.</p>`,
+	)
 }
 
 export function landingPage(cfg: HttpConfig): string {
-  const mcp = new URL('/mcp', cfg.publicUrl).href
-  return page(
-    'thinks',
-    `<h1>thinks</h1>
+	const mcp = new URL('/mcp', cfg.publicUrl).href
+	return page(
+		'thinks',
+		`<h1>thinks</h1>
 <p>MCP-коннектор, который пишет, отвечает и переформулирует твоим голосом -- по твоей же переписке в Telegram. Сам он ничего не генерирует: отдаёт модели стиль-профиль и твои настоящие сообщения под запрос.</p>
 <p><a href="/account">Личный кабинет</a> -- загрузить выгрузку, настроить, удалить данные.</p>
-<p>Адрес коннектора: <code>${escapeHtml(mcp)}</code></p>`
-  )
+<p>Адрес коннектора: <code>${escapeHtml(mcp)}</code></p>`,
+	)
 }
 
 export function accountLoginPage(cfg: HttpConfig): string {
-  const authUrl = new URL('/account/login', cfg.publicUrl).href
-  return page(
-    'Кабинет thinks',
-    `<h1>Кабинет thinks</h1>
+	const authUrl = new URL('/account/login', cfg.publicUrl).href
+	return page(
+		'Кабинет thinks',
+		`<h1>Кабинет thinks</h1>
 <p>Войди через Telegram. Корпус привязан к твоему аккаунту, и загрузить можно только свою выгрузку.</p>
-${loginButton(cfg, authUrl)}`
-  )
+${loginButton(cfg, authUrl)}`,
+	)
 }
 
 const STATE_TEXT: Record<BuildStatus['state'], string> = {
-  queued: 'в очереди на сборку',
-  building: 'собирается',
-  ready: 'собран',
-  failed: 'сборка не удалась',
+	queued: 'в очереди на сборку',
+	building: 'собирается',
+	ready: 'собран',
+	failed: 'сборка не удалась',
 }
 
 export function accountPage(
-  cfg: HttpConfig,
-  opts: {
-    name: string
-    hasCorpus: boolean
-    status: BuildStatus | null
-    settings: UserSettings
-  }
+	cfg: HttpConfig,
+	opts: {
+		name: string
+		hasCorpus: boolean
+		status: BuildStatus | null
+		settings: UserSettings
+	},
 ): string {
-  const mcp = new URL('/mcp', cfg.publicUrl).href
-  const { status, settings } = opts
-  const busy = status?.state === 'queued' || status?.state === 'building'
+	const mcp = new URL('/mcp', cfg.publicUrl).href
+	const { status, settings } = opts
+	const busy = status?.state === 'queued' || status?.state === 'building'
 
-  const corpusLine = busy
-    ? `Корпус ${STATE_TEXT[status!.state]}. Страница обновится сама.`
-    : opts.hasCorpus
-      ? 'Корпус собран, коннектор готов к работе.'
-      : 'Корпуса пока нет: загрузи выгрузку ниже.'
-  const failure =
-    status?.state === 'failed'
-      ? `<p><strong>Последняя сборка не удалась:</strong> ${escapeHtml(status.message)}</p>`
-      : ''
-  const maxMb = Math.round(cfg.maxUploadBytes / 1024 / 1024)
+	const corpusLine = busy
+		? `Корпус ${STATE_TEXT[status!.state]}. Страница обновится сама.`
+		: opts.hasCorpus
+			? 'Корпус собран, коннектор готов к работе.'
+			: 'Корпуса пока нет: загрузи выгрузку ниже.'
+	const failure =
+		status?.state === 'failed'
+			? `<p><strong>Последняя сборка не удалась:</strong> ${escapeHtml(status.message)}</p>`
+			: ''
+	const maxMb = Math.round(cfg.maxUploadBytes / 1024 / 1024)
 
-  return page(
-    'Кабинет thinks',
-    `<h1>Привет, ${escapeHtml(opts.name)}</h1>
+	return page(
+		'Кабинет thinks',
+		`<h1>Привет, ${escapeHtml(opts.name)}</h1>
 <p>${corpusLine}</p>${failure}
 ${busy ? '<script>setTimeout(() => location.reload(), 5000)</script>' : ''}
 
@@ -173,6 +167,6 @@ document.getElementById('upload').onclick = () => {
   xhr.onerror = () => { progress.textContent = 'Соединение оборвалось' }
   xhr.send(file)
 }
-</script>`
-  )
+</script>`,
+	)
 }

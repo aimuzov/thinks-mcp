@@ -1,5 +1,6 @@
-import { buildCorpus } from '../corpus/build.js'
-import { Users } from './users.js'
+import { buildCorpus } from '#thinks/corpus/build'
+
+import { Users } from './users.ts'
 
 /**
  * One corpus build, run as a child process of the server.
@@ -12,16 +13,16 @@ import { Users } from './users.js'
  */
 const [dataDir, userId, dumpPath, dbPath] = process.argv.slice(2)
 if (!dataDir || !userId || !dumpPath || !dbPath) {
-  console.error('usage: buildWorker.js <data dir> <user id> <dump> <db>')
-  process.exit(2)
+	console.error('usage: buildWorker.js <data dir> <user id> <dump> <db>')
+	process.exit(2)
 }
 
 try {
-  const cfg = { ...new Users(dataDir).config(userId), dumpPath, dbPath }
-  buildCorpus(cfg, msg => console.error(msg), {
-    expectOwnerId: `user${userId}`,
-  })
+	const cfg = { ...new Users(dataDir).config(userId), dumpPath, dbPath }
+	buildCorpus(cfg, (msg) => console.error(msg), {
+		expectOwnerId: `user${userId}`,
+	})
 } catch (err) {
-  console.error(err instanceof Error ? err.message : err)
-  process.exit(1)
+	console.error(err instanceof Error ? err.message : err)
+	process.exit(1)
 }

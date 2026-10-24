@@ -1,78 +1,84 @@
 {
-  "name": "@aimuzov/thinks-mcp",
-  "version": "0.5.0",
-  "description": "MCP server that writes, replies and rephrases in your own voice, learned from a Telegram export. Hands the calling model a measured style profile and your real messages — no API keys, no generation of its own.",
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "mcp-server",
-    "claude",
-    "claude-code",
-    "claude-desktop",
-    "cowork",
-    "ai",
-    "llm",
-    "stdio",
-    "telegram",
-    "writing-style",
-    "personal-voice",
-    "style-transfer",
-    "russian"
-  ],
-  "homepage": "https://github.com/aimuzov/thinks-mcp#readme",
-  "bugs": {
-    "url": "https://github.com/aimuzov/thinks-mcp/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/aimuzov/thinks-mcp.git"
-  },
-  "license": "MIT",
-  "author": "Aleksey Imuzov",
-  "type": "module",
-  "engines": {
-    "node": ">=24.0.0"
-  },
-  "bin": {
-    "thinks-mcp": "build/index.js"
-  },
-  "files": [
-    "build",
-    "README.md",
-    "README.ru.md",
-    "CHANGELOG.md",
-    "LICENSE",
-    ".mcp.json.example"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "scripts": {
-    "build": "tsc && chmod +x build/index.js",
-    "dev": "tsc --watch",
-    "start": "node build/index.js",
-    "corpus": "node --max-old-space-size=8192 build/index.js build",
-    "profile": "node build/index.js profile",
-    "where": "node build/index.js where",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\"",
-    "prepublishOnly": "npm run typecheck && npm run format:check && npm run test && npm run build"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
-    "express": "5.2.1",
-    "jose": "6.2.8",
-    "zod": "4.4.3"
-  },
-  "devDependencies": {
-    "@types/express": "5.0.6",
-    "@types/node": "24.13.2",
-    "prettier": "3.8.4",
-    "typescript": "5.9.3",
-    "vitest": "4.1.8"
-  },
-  "packageManager": "pnpm@11.5.1"
+	"name": "@aimuzov/thinks-mcp",
+	"version": "0.5.0",
+	"description": "MCP server that writes, replies and rephrases in your own voice, learned from a Telegram export. Hands the calling model a measured style profile and your real messages — no API keys, no generation of its own.",
+	"keywords": [
+		"mcp",
+		"model-context-protocol",
+		"mcp-server",
+		"claude",
+		"claude-code",
+		"claude-desktop",
+		"cowork",
+		"ai",
+		"llm",
+		"stdio",
+		"telegram",
+		"writing-style",
+		"personal-voice",
+		"style-transfer",
+		"russian"
+	],
+	"homepage": "https://github.com/aimuzov/thinks-mcp#readme",
+	"bugs": {
+		"url": "https://github.com/aimuzov/thinks-mcp/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/aimuzov/thinks-mcp.git"
+	},
+	"license": "MIT",
+	"author": "Aleksey Imuzov",
+	"type": "module",
+	"engines": {
+		"node": ">=26"
+	},
+	"bin": {
+		"thinks-mcp": "build/index.js"
+	},
+	"files": [
+		"build",
+		"README.md",
+		"README.ru.md",
+		"CHANGELOG.md",
+		"LICENSE",
+		".mcp.json.example"
+	],
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
+	},
+	"scripts": {
+		"start": "node --conditions=development src/index.ts",
+		"build": "rm -rf build && tsc -p tsconfig.build.json && chmod +x build/index.js",
+		"typecheck": "tsc",
+		"test": "node --conditions=development --test 'src/**/*.test.ts'",
+		"format": "oxlint --fix && prettier --write .",
+		"format:check": "prettier --check .",
+		"lint": "oxlint --deny-warnings",
+		"corpus": "node --conditions=development --max-old-space-size=8192 src/index.ts build",
+		"profile": "node --conditions=development src/index.ts profile",
+		"where": "node --conditions=development src/index.ts where",
+		"prepack": "npm run build"
+	},
+	"dependencies": {
+		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v1.0.0",
+		"@modelcontextprotocol/sdk": "1.32.1",
+		"express": "5.2.1",
+		"zod": "4.6.7"
+	},
+	"devDependencies": {
+		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v4.0.0",
+		"@types/express": "5.0.6",
+		"@types/node": "26.6.5",
+		"oxlint": "1.87.0",
+		"prettier": "3.9.9",
+		"typescript": "6.0.3"
+	},
+	"imports": {
+		"#thinks/*": {
+			"development": "./src/*.ts",
+			"default": "./build/*.js"
+		}
+	}
 }

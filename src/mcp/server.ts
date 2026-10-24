@@ -1,21 +1,21 @@
 import { createRequire } from 'node:module'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { ensureDataDir, type Config } from '../config.js'
-import { CorpusRef, type ToolContext } from './context.js'
-import { registerPrompts } from './prompts.js'
-import { voiceInstructions } from './voice.js'
-import { registerResources } from './resources.js'
-import { registerCheckAsMe } from './tools/checkAsMe.js'
-import { registerFindMyMessages } from './tools/findMyMessages.js'
-import { registerReplyAsMe } from './tools/replyAsMe.js'
-import { registerRephraseAsMe } from './tools/rephraseAsMe.js'
-import { registerWriteAsMe } from './tools/writeAsMe.js'
+
+import { ensureDataDir, type Config } from '#thinks/config'
+
+import { CorpusRef, type ToolContext } from './context.ts'
+import { registerPrompts } from './prompts.ts'
+import { registerResources } from './resources.ts'
+import { registerCheckAsMe } from './tools/checkAsMe.ts'
+import { registerFindMyMessages } from './tools/findMyMessages.ts'
+import { registerRephraseAsMe } from './tools/rephraseAsMe.ts'
+import { registerReplyAsMe } from './tools/replyAsMe.ts'
+import { registerWriteAsMe } from './tools/writeAsMe.ts'
+import { voiceInstructions } from './voice.ts'
 
 // Read at runtime so the MCP handshake can never report a stale version.
-const { version: VERSION } = createRequire(import.meta.url)(
-  '../../package.json'
-) as { version: string }
+const { version: VERSION } = createRequire(import.meta.url)('../../package.json') as { version: string }
 
 /**
  * Build a fully-wired MCP server.
@@ -24,35 +24,32 @@ const { version: VERSION } = createRequire(import.meta.url)(
  * MCP config, and a machine that has not imported an archive yet should see a
  * working server that explains what to do, not a failed one.
  */
-export function createServer(
-  cfg: Config,
-  corpus: CorpusRef = new CorpusRef(cfg)
-): McpServer {
-  ensureDataDir(cfg)
+export function createServer(cfg: Config, corpus: CorpusRef = new CorpusRef(cfg)): McpServer {
+	ensureDataDir(cfg)
 
-  const ctx: ToolContext = { cfg, corpus }
-  // Instructions are read once, when the client connects: a corpus built or a
-  // switch flipped later takes effect in the next conversation.
-  const profile = cfg.voice ? corpus.get()?.profile : undefined
-  const server = new McpServer(
-    { name: 'thinks-mcp', version: VERSION },
-    profile ? { instructions: voiceInstructions(profile) } : {}
-  )
+	const ctx: ToolContext = { cfg, corpus }
+	// Instructions are read once, when the client connects: a corpus built or a
+	// switch flipped later takes effect in the next conversation.
+	const profile = cfg.voice ? corpus.get()?.profile : undefined
+	const server = new McpServer(
+		{ name: 'thinks-mcp', version: VERSION },
+		profile ? { instructions: voiceInstructions(profile) } : {},
+	)
 
-  registerWriteAsMe(server, ctx)
-  registerReplyAsMe(server, ctx)
-  registerRephraseAsMe(server, ctx)
-  registerCheckAsMe(server, ctx)
-  registerFindMyMessages(server, ctx)
-  registerResources(server, ctx)
-  registerPrompts(server, ctx)
+	registerWriteAsMe(server, ctx)
+	registerReplyAsMe(server, ctx)
+	registerRephraseAsMe(server, ctx)
+	registerCheckAsMe(server, ctx)
+	registerFindMyMessages(server, ctx)
+	registerResources(server, ctx)
+	registerPrompts(server, ctx)
 
-  return server
+	return server
 }
 
 /** Run the MCP server over stdio. */
 export async function serve(cfg: Config): Promise<void> {
-  const server = createServer(cfg)
-  await server.connect(new StdioServerTransport())
-  console.error('thinks-mcp running on stdio')
+	const server = createServer(cfg)
+	await server.connect(new StdioServerTransport())
+	console.error('thinks-mcp running on stdio')
 }
