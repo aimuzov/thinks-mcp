@@ -31,8 +31,8 @@ MCP-сервер, который пишет, отвечает и перефор�
 
 ## Установка
 
-Нужен Node 24 или новее: корпус и поиск построены на `node:sqlite` с FTS5,
-который стабилен начиная с этой версии.
+Нужен Node 26 или новее: корпус и поиск построены на `node:sqlite` с FTS5,
+а общий кит под ним рассчитан на Node 26.
 
 ### Через mise
 
@@ -43,7 +43,7 @@ mise use -g npm:@aimuzov/thinks-mcp
 ### Локально, из исходников
 
 ```bash
-pnpm i && pnpm build && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
+npm ci && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
 ```
 
 Учти: `npm i -g` ставит бинарник в ту версию Node, которая активна в этот
@@ -273,9 +273,9 @@ thinks-mcp --help
 В самом репозитории:
 
 ```bash
-mise run check           # типы, форматирование, тесты
-pnpm test
-pnpm build
+mise run check           # форматирование, линтер, типы, тесты
+npm test
+npm run build
 ```
 
 `holdout` — слепая проверка качества: при сборке 20 реальных пар

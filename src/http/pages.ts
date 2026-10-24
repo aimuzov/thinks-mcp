@@ -102,11 +102,15 @@ export function accountPage(view: AccountView): string {
 					</div>
 					<ol class="steps">
 						<li>
-							claude.ai и Claude Desktop: Settings → Connectors → Add custom connector, вставить адрес.
+							<b>claude.ai и&nbsp;Claude Desktop</b
+							><span>Settings → Connectors → Add custom connector, вставить адрес.</span>
 						</li>
 						<li>
-							Claude Code: <code>claude mcp add --transport http thinks ${mcpUrl}</code>, затем
-							<code>/mcp</code> для входа.
+							<b>Claude Code</b
+							><span
+								><code>claude mcp add --transport http thinks ${mcpUrl}</code>, затем
+								<code>/mcp</code> для входа.</span
+							>
 						</li>
 					</ol>`,
 			}),

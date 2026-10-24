@@ -31,8 +31,8 @@ instead of one paragraph. Indexing single messages would teach the opposite.
 
 ## Install
 
-Node 24 or newer. The corpus and the search are built on `node:sqlite` with
-FTS5, which is stable from that version on.
+Node 26 or newer. The corpus and the search are built on `node:sqlite` with
+FTS5, and the shared kit underneath targets Node 26.
 
 ### Through mise
 
@@ -43,7 +43,7 @@ mise use -g npm:@aimuzov/thinks-mcp
 ### From source
 
 ```bash
-pnpm i && pnpm build && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
+npm ci && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
 ```
 
 Note that `npm i -g` installs the binary into whichever Node version is active
@@ -274,9 +274,9 @@ thinks-mcp --help
 In the repository itself:
 
 ```bash
-mise run check           # types, formatting, tests
-pnpm test
-pnpm build
+mise run check           # formatting, lint, types, tests
+npm test
+npm run build
 ```
 
 `holdout` is the blind quality check: at build time 20 real incoming/answer
