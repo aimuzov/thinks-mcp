@@ -34,7 +34,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
     steps:
       - id: release
-        uses: aimuzov-projects/infra-site-kit/release@v2
+        uses: aimuzov/infra-site-kit/release@v3
 
   check:
     needs: release
@@ -56,7 +56,7 @@ jobs:
       name: production
       url: https://thinks-mcp.aimuzov.online
     steps:
-      - uses: aimuzov-projects/infra-site-kit/deploy@v2
+      - uses: aimuzov/infra-site-kit/deploy@v3
         with:
           ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
           url: https://thinks-mcp.aimuzov.online/health

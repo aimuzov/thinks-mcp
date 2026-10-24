@@ -1,5 +1,5 @@
 # thinks-mcp on the projects server. Ports 80/443 belong to the shared Caddy from
-# aimuzov-projects/infra-server, which proxies the domain here over the `edge` network.
+# aimuzov/infra-server, which proxies the domain here over the `edge` network.
 
 name: thinks-mcp
 
