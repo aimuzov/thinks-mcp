@@ -18,17 +18,20 @@ describe('measureTypography', () => {
 			'ключ--значение',
 			'Кеш живёт до перезапуска -- дольше не нужно.',
 		]
+
 		assert.equal(share('двойной дефис --', texts), 20)
 	})
 
 	it('tells the ellipsis character and the arrow from their ASCII spelling', () => {
 		const texts = ['Ну...', 'Ну…', 'a => b', 'a → b']
+
 		assert.equal(share('многоточие одним знаком …', texts), 25)
 		assert.equal(share('стрелка →', texts), 25)
 	})
 
 	it('leaves every probe at zero for a corpus without them', () => {
 		const measured = measureTypography(['Обычный текст без знаков.'])
+
 		assert.equal(
 			measured.every((a) => a.share === 0),
 			true,

@@ -33,7 +33,10 @@ export function lengthBounds(
 	length: 'short' | 'normal' | 'long' | undefined,
 ): { minChars?: number; maxChars?: number } {
 	const m = profile.registers[register]
+
 	if (!m || !length || length === 'normal') return {}
+
 	if (length === 'short') return { maxChars: m.turnLength.median }
+
 	return { minChars: m.turnLength.p75 }
 }

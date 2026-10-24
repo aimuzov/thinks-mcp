@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-export interface Config {
+export type Config = {
 	/** Telegram export to build the corpus from. */
 	dumpPath: string
 	/** Directory holding the built index. */
@@ -58,7 +58,7 @@ export interface Config {
 }
 
 /** A mark the owner never types, with what they type in its place. */
-export interface NeverMark {
+export type NeverMark = {
 	mark: string
 	/** Empty when the owner named the mark without a replacement. */
 	standIn: string
@@ -81,6 +81,7 @@ const DEFAULT_RECENT_YEARS = 3
 function defaultDataDir(env: Env): string {
 	const xdg = env.XDG_CONFIG_HOME?.trim()
 	const base = xdg || join(homedir(), '.config')
+
 	return join(base, 'thinks-mcp')
 }
 
@@ -114,7 +115,9 @@ export function loadConfig(env: Env = process.env): Config {
 function parseNeverMarks(raw: string | undefined): NeverMark[] {
 	return splitList(raw).map((pair) => {
 		const colon = pair.indexOf(':', 1)
+
 		if (colon === -1) return { mark: pair, standIn: '' }
+
 		return {
 			mark: pair.slice(0, colon).trim(),
 			standIn: pair.slice(colon + 1).trim(),
@@ -124,6 +127,7 @@ function parseNeverMarks(raw: string | undefined): NeverMark[] {
 
 function splitList(raw: string | undefined): string[] {
 	if (!raw) return []
+
 	return raw
 		.split(',')
 		.map((s) => s.trim())

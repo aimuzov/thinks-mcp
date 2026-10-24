@@ -1,7 +1,7 @@
 import { measureTypography, word, type AntiPattern } from './antipatterns.ts'
 
 /** Sizes measured within one genre. */
-export interface GenreSizes {
+export type GenreSizes = {
 	blocks: number
 	/** Width of a single comment line, in characters. */
 	lineWidth: { median: number; p75: number; p90: number; max: number }
@@ -23,7 +23,7 @@ export interface GenreSizes {
 	russian: number
 }
 
-export interface CodeMetrics {
+export type CodeMetrics = {
 	blocks: number
 	lines: number
 	/**
@@ -55,7 +55,7 @@ export interface CodeMetrics {
 	typographyUntil?: number
 }
 
-export interface CodeBlockInput {
+export type CodeBlockInput = {
 	repo: string
 	lines: string[]
 	text: string
@@ -94,6 +94,7 @@ export function splitMarkers(code: CodeMetrics): {
 	const top = code.markers[0]?.count ?? 0
 	const own = code.markers.filter((m) => m.count >= top / 10).map((m) => m.name)
 	const foreign = MARKERS.filter((name) => !own.includes(name))
+
 	return { own, foreign }
 }
 
@@ -120,6 +121,7 @@ const percentile = (sorted: number[], p: number) =>
 
 const round = (n: number, digits = 3) => {
 	const f = 10 ** digits
+
 	return Math.round(n * f) / f
 }
 
@@ -130,7 +132,9 @@ function sizesOf(blocks: CodeBlockInput[]): GenreSizes {
 
 	for (const block of blocks) {
 		for (const line of block.lines) if (line) widths.push(line.length)
+
 		spans.push(block.lines.length)
+
 		if (block.lang === 'ru') russian++
 	}
 
@@ -171,8 +175,11 @@ export function measureCode(blocks: CodeBlockInput[], typographyUntil = 0): Code
 
 	for (const block of blocks) {
 		for (const line of block.lines) if (line) lines++
+
 		if (block.isDoc) doc++
+
 		if (block.lang === 'ru') russian++
+
 		repoCounts.set(block.repo, (repoCounts.get(block.repo) ?? 0) + 1)
 
 		for (const marker of MARKERS) {
@@ -180,9 +187,12 @@ export function measureCode(blocks: CodeBlockInput[], typographyUntil = 0): Code
 				markerCounts.set(marker, (markerCounts.get(marker) ?? 0) + 1)
 			}
 		}
+
 		const lower = block.text.toLowerCase()
+
 		for (const phrase of CONNECTIVES) {
 			const re = /^[a-z ]+$/.test(phrase) ? new RegExp(phrase) : word(phrase)
+
 			if (re.test(lower)) {
 				connectiveCounts.set(phrase, (connectiveCounts.get(phrase) ?? 0) + 1)
 			}
@@ -227,11 +237,13 @@ function typographyOf(blocks: CodeBlockInput[], until: number): CodeMetrics['typ
 			.filter((b) => b.isDoc === isDoc)
 			.flatMap((b) => b.lines)
 			.filter(Boolean)
+
 		return lines.length >= MIN_TYPOGRAPHY_LINES ? measureTypography(lines) : undefined
 	}
 
 	const code = perGenre(false)
 	const jsdoc = perGenre(true)
+
 	return {
 		...(code ? { code } : {}),
 		...(jsdoc ? { jsdoc } : {}),

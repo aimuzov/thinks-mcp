@@ -2,7 +2,7 @@ import { isCodeRegister, type Register } from '#thinks/corpus/types'
 import type { TurnRow } from '#thinks/search/query'
 import { constraintsOf, renderProfile, type StyleProfile } from '#thinks/style/profile'
 
-export interface BriefInput {
+export type BriefInput = {
 	/** What the caller has to produce, phrased as an instruction. */
 	task: string
 	register: Register
@@ -31,12 +31,16 @@ function renderExample(row: TurnRow, n: number): string {
 		// A comment is only judgeable against the code it sits above.
 		lines.push(`[${n}] ${where}, ${row.chatKey ?? ''} ${row.year}`.trimEnd())
 		lines.push('  Комментарий:')
+
 		for (const part of row.parts) lines.push(`    ${part}`)
+
 		if (row.contextIn) lines.push(`  Над кодом: ${row.contextIn}`)
+
 		return lines.join('\n')
 	}
 
 	lines.push(`[${n}] ${where}, ${row.year}`)
+
 	if (row.contextIn) {
 		// Quoted and inferred pairs are not equally trustworthy, and a model that
 		// cannot tell them apart treats a coincidence as an answer.
@@ -46,8 +50,11 @@ function renderExample(row: TurnRow, n: number): string {
 				: `  Перед этим написали: ${row.contextIn}`,
 		)
 	}
+
 	lines.push('  Я ответил:')
+
 	for (const part of row.parts) lines.push(`    ${part}`)
+
 	return lines.join('\n')
 }
 
@@ -62,12 +69,14 @@ function defaultContract(register: Register): string {
 				'напиши только проверяемый факт или TODO с честной формулировкой незнания.',
 		].join('\n')
 	}
+
 	if (register === 'longform') {
 		return [
 			'Выведи только готовый текст, без преамбулы, пояснений и кавычек.',
 			'Не добавляй заголовков и списков, если их нет в примерах.',
 		].join('\n')
 	}
+
 	return [
 		'Выведи только готовые сообщения, без преамбулы, пояснений и кавычек.',
 		'Одно сообщение -- одна строка. Если мысль просится на две-три реплики, ' +
@@ -107,6 +116,7 @@ export function renderBrief(input: BriefInput): string {
 
 	if (examples.length) {
 		const rendered = examples.map((row, i) => renderExample(row, i + 1))
+
 		sections.push(
 			[
 				'# ПРИМЕРЫ ИЗ АРХИВА',
@@ -120,6 +130,7 @@ export function renderBrief(input: BriefInput): string {
 	}
 
 	const constraints = [...constraintsOf(profile, register), ...(input.extraConstraints ?? [])]
+
 	if (constraints.length) {
 		sections.push(['# ОГРАНИЧЕНИЯ', '', ...constraints.map((c) => `- ${c}`)].join('\n'))
 	}
@@ -127,17 +138,4 @@ export function renderBrief(input: BriefInput): string {
 	sections.push(['# ФОРМАТ ОТВЕТА', '', input.outputContract ?? defaultContract(register)].join('\n'))
 
 	return sections.join('\n\n')
-}
-
-/** Wrap a brief as an MCP tool result. */
-export function briefResult(text: string) {
-	return { content: [{ type: 'text' as const, text }] }
-}
-
-/** Wrap a user-facing error as an MCP tool error result. */
-export function errorResult(message: string) {
-	return {
-		content: [{ type: 'text' as const, text: message }],
-		isError: true as const,
-	}
 }

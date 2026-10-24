@@ -20,13 +20,13 @@ export const isCodeRegister = (r: Register): boolean => r === 'code' || r === 'j
  * holds for every message of a real export — so sanitizing at the entity level
  * is exact and needs no regex over raw text.
  */
-export interface TextEntity {
+export type TextEntity = {
 	type: string
 	text: string
 }
 
 /** One message, normalized out of the export's many optional shapes. */
-export interface ParsedMessage {
+export type ParsedMessage = {
 	id: number
 	/** Unix seconds. */
 	ts: number
@@ -43,7 +43,7 @@ export interface ParsedMessage {
 	replyToId: number | null
 }
 
-export interface ParsedChat {
+export type ParsedChat = {
 	id: number
 	name: string
 	/** Raw export type: personal_chat | private_group | private_supergroup | ... */
@@ -56,7 +56,7 @@ export interface ParsedChat {
 }
 
 /** A run of consecutive owner messages, the unit the corpus is built from. */
-export interface Turn {
+export type Turn = {
 	/** Chat pseudonym for chat turns, repository name for code ones. */
 	chatKey: string
 	/**

@@ -12,7 +12,7 @@ import { collectSurnames, createSanitizer, namePrefixes, PLACEHOLDER_WORDS } fro
 import { buildTurns } from './turns.ts'
 import type { Turn } from './types.ts'
 
-export interface BuildReport {
+export type BuildReport = {
 	ownerId: string
 	chats: number
 	turns: number
@@ -23,7 +23,7 @@ export interface BuildReport {
 	filtered: FilterStats
 }
 
-export interface BuildOptions {
+export type BuildOptions = {
 	/**
 	 * Refuse the dump unless it is this account's own export. The hosted server
 	 * sets it to the logged-in user, so nobody can upload someone else's
@@ -44,15 +44,19 @@ export function buildCorpus(cfg: Config, log: (msg: string) => void = () => {}, 
 	const dump = readDump(cfg.dumpPath)
 
 	const ownerId = cfg.ownerId || resolveOwnerId(dump)
+
 	log(`Владелец архива: ${ownerId}`)
+
 	if (opts.expectOwnerId && ownerId !== opts.expectOwnerId) {
 		throw new Error(`Это выгрузка другого аккаунта: ${ownerId}, а не ${opts.expectOwnerId}`)
 	}
 
 	const names = new Set<string>()
+
 	for (const chat of iterateChats(dump, cfg.chatStopList)) {
 		for (const m of chat.messages) if (m.from) names.add(m.from)
 	}
+
 	const san = createSanitizer(collectSurnames(names))
 	const prefixes = namePrefixes(names)
 
@@ -65,13 +69,17 @@ export function buildCorpus(cfg: Config, log: (msg: string) => void = () => {}, 
 
 	for (const chat of iterateChats(dump, cfg.chatStopList)) {
 		chats++
+
 		for (const m of chat.messages) {
 			if (!m.text) continue
+
 			// Count the sanitized text, not the raw one: a URL contributes "https",
 			// "com" and "watch", which would otherwise dominate the markers while
 			// saying nothing about how the owner writes.
 			const cleaned = san.clean(m.entities)
+
 			if (!cleaned) continue
+
 			if (m.fromId === ownerId) {
 				if (!m.isForwarded) countWords(cleaned, mineWords, mineCapitalized)
 			} else {
@@ -97,6 +105,7 @@ export function buildCorpus(cfg: Config, log: (msg: string) => void = () => {}, 
 
 	const holdout = pickHoldout(turns, cfg.holdoutSize)
 	const db = openDb(cfg.dbPath)
+
 	// Only the chat registers: a code corpus built earlier must survive this.
 	resetRegisters(db, ['dm', 'group'])
 	insertTurns(db, turns, holdout)
@@ -105,6 +114,7 @@ export function buildCorpus(cfg: Config, log: (msg: string) => void = () => {}, 
 
 	const builtAt = new Date().toISOString()
 	const recentFrom = new Date().getUTCFullYear() - cfg.recentYears + 1
+
 	saveChatProfile(db, {
 		builtAt,
 		registers: measureRegisters(db),
@@ -117,6 +127,7 @@ export function buildCorpus(cfg: Config, log: (msg: string) => void = () => {}, 
 		antiPatterns: findAntiPatterns(turns),
 		typography: measureTypography(turns.flatMap((t) => t.parts)),
 	})
+
 	setMeta(db, 'owner_id', ownerId)
 	setMeta(db, 'built_at', builtAt)
 	log('Профиль посчитан')
@@ -131,14 +142,17 @@ export function buildCorpus(cfg: Config, log: (msg: string) => void = () => {}, 
 		holdout: holdout.size,
 		filtered: stats,
 	}
+
 	setMeta(db, 'report', JSON.stringify(report))
 	db.close()
+
 	return report
 }
 
 /** Human-readable build summary, printed by the CLI. */
 export function formatReport(r: BuildReport): string {
 	const n = (x: number) => x.toLocaleString('ru')
+
 	return [
 		`Чатов обработано:      ${n(r.chats)}`,
 		`Ходов в корпусе:       ${n(r.turns)}`,

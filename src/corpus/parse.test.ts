@@ -9,12 +9,16 @@ import { makeDump } from '#thinks/testing/fixtures'
 import { chatsOf, iterateChats, readDump, resolveOwnerId, streamChats, type Dump } from './parse.ts'
 
 const dir = mkdtempSync(join(tmpdir(), 'thinks-parse-'))
+
 after(() => rmSync(dir, { recursive: true, force: true }))
 
 let files = 0
+
 function write(dump: unknown, indent?: number): string {
 	const path = join(dir, `dump-${files++}.json`)
+
 	writeFileSync(path, JSON.stringify(dump, null, indent))
+
 	return path
 }
 
@@ -22,6 +26,7 @@ function write(dump: unknown, indent?: number): string {
 function realisticDump() {
 	const dump = makeDump()
 	const [petr, neighbours] = dump.chats.list
+
 	return {
 		about: 'Here is the data you requested. {"not": ["a", "chat"]}',
 		personal_information: { user_id: 1, first_name: 'Ivan', bio: '\\"}]' },
@@ -75,24 +80,31 @@ type Chats = ReturnType<typeof chatsOf>
 function legacyOwner(chats: Chats): string {
 	for (const chat of chats) {
 		if (chat.type !== 'saved_messages') continue
+
 		for (const m of chat.messages ?? []) if (m.from_id) return m.from_id
 	}
+
 	const counts = new Map<string, number>()
+
 	for (const chat of chats) {
 		for (const m of chat.messages ?? []) {
 			if (m.from_id) counts.set(m.from_id, (counts.get(m.from_id) ?? 0) + 1)
 		}
 	}
+
 	let best = ''
+
 	for (const [id, count] of counts) {
 		if (count > (counts.get(best) ?? 0)) best = id
 	}
+
 	return best
 }
 
 /** What the whole-file `JSON.parse` used to give. */
 function legacy(dump: object) {
 	const chats = chatsOf(JSON.parse(JSON.stringify(dump)) as Parameters<typeof chatsOf>[0])
+
 	return {
 		owner: legacyOwner(chats),
 		chats: [...iterateChats(chats, ['Соседи'])],
@@ -101,6 +113,7 @@ function legacy(dump: object) {
 
 function streamed(path: string, chunkSize?: number) {
 	const chats: Dump = { [Symbol.iterator]: () => streamChats(path, chunkSize) }
+
 	return {
 		owner: resolveOwnerId(chats),
 		chats: [...iterateChats(chats, ['Соседи'])],
@@ -112,6 +125,7 @@ describe('streaming parser', () => {
 		const dump = makeDump()
 		const path = write(dump)
 		const parsed = streamed(path)
+
 		assert.deepEqual(parsed, legacy(dump))
 		assert.ok(parsed.chats.length > 0)
 	})
@@ -119,8 +133,10 @@ describe('streaming parser', () => {
 	it('matches on a realistic export at any chunk size', () => {
 		const dump = realisticDump()
 		const expected = legacy(dump)
+
 		for (const indent of [undefined, 1]) {
 			const path = write(dump, indent)
+
 			for (const chunk of [1, 2, 3, 7, 64, 1 << 20]) {
 				assert.deepEqual(streamed(path, chunk), expected)
 			}
@@ -129,18 +145,21 @@ describe('streaming parser', () => {
 
 	it('falls back to the busiest sender without Saved Messages', () => {
 		const dump = makeDump()
+
 		dump.chats.list = dump.chats.list.filter((c) => c.type !== 'saved_messages')
 		assert.equal(resolveOwnerId(readDump(write(dump))), legacy(dump).owner)
 	})
 
 	it('re-reads the file on every pass', () => {
 		const dump = readDump(write(makeDump()))
+
 		assert.equal([...dump].length, 3)
 		assert.equal([...dump].length, 3)
 	})
 
 	it('reports where a truncated file breaks', () => {
 		const path = join(dir, 'broken.json')
+
 		writeFileSync(path, JSON.stringify(makeDump()).slice(0, 500))
 		assert.throws(() => [...readDump(path)], SyntaxError)
 	})

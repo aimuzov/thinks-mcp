@@ -2,7 +2,7 @@
 export type CommentSyntax = 'c' | 'hash' | 'lua'
 
 /** A run of consecutive comment lines — the code equivalent of a chat turn. */
-export interface CommentBlock {
+export type CommentBlock = {
 	/** Comment text with markers stripped, one entry per source line. */
 	lines: string[]
 	/** 1-based line number of the first comment line. */
@@ -56,6 +56,7 @@ const SYNTAX_BY_EXTENSION: Record<string, CommentSyntax> = {
 
 export function syntaxFor(path: string): CommentSyntax | null {
 	const ext = path.split('.').pop()?.toLowerCase() ?? ''
+
 	return SYNTAX_BY_EXTENSION[ext] ?? null
 }
 
@@ -67,13 +68,14 @@ export function syntaxFor(path: string): CommentSyntax | null {
  * author writes above the code anyway — every example in their own corpus is a
  * whole-line comment — so the ambiguous case is not worth the false positives.
  */
-interface LineInfo {
+type LineInfo = {
 	text: string
 	isDoc: boolean
 }
 
 function classify(raw: string, syntax: CommentSyntax): LineInfo | null {
 	const line = raw.trim()
+
 	if (!line) return null
 
 	if (syntax === 'c') {
@@ -81,22 +83,31 @@ function classify(raw: string, syntax: CommentSyntax): LineInfo | null {
 		if (line.startsWith('/**')) {
 			return { text: stripBlock(line.slice(3)), isDoc: true }
 		}
+
 		if (line.startsWith('/*')) return { text: stripBlock(line.slice(2)), isDoc: false }
+
 		if (line.startsWith('*/')) return { text: '', isDoc: false }
+
 		if (line.startsWith('*')) return { text: line.slice(1).trim(), isDoc: false }
+
 		if (line.startsWith('//')) return { text: line.slice(2).trim(), isDoc: false }
+
 		return null
 	}
 
 	if (syntax === 'lua') {
 		if (line.startsWith('---')) return { text: line.slice(3).trim(), isDoc: true }
+
 		if (line.startsWith('--')) return { text: line.slice(2).trim(), isDoc: false }
+
 		return null
 	}
 
 	// Hash: skip the shebang, it is not prose.
 	if (line.startsWith('#!')) return null
+
 	if (line.startsWith('#')) return { text: line.replace(/^#+/, '').trim(), isDoc: false }
+
 	return null
 }
 
@@ -109,10 +120,12 @@ const LATIN = /[a-z]/i
 export function detectLang(text: string): 'ru' | 'en' {
 	let ru = 0
 	let en = 0
+
 	for (const ch of text) {
 		if (CYRILLIC.test(ch)) ru++
 		else if (LATIN.test(ch)) en++
 	}
+
 	return ru > en * 0.3 ? 'ru' : 'en'
 }
 
@@ -138,9 +151,12 @@ export function extractBlocks(source: string, syntax: CommentSyntax): CommentBlo
 	const flush = () => {
 		// Drop the trailing blank line a `*/` leaves behind.
 		while (current.length && !current.at(-1)) current.pop()
+
 		while (current.length && !current[0]) current.shift()
+
 		if (current.length) {
 			const text = current.join(' ')
+
 			blocks.push({
 				lines: current,
 				startLine: start,
@@ -149,6 +165,7 @@ export function extractBlocks(source: string, syntax: CommentSyntax): CommentBlo
 				code: codeBelow(lines, endIndex, syntax),
 			})
 		}
+
 		current = []
 		isDoc = false
 	}
@@ -161,6 +178,7 @@ export function extractBlocks(source: string, syntax: CommentSyntax): CommentBlo
 			inBlockComment = false
 			endIndex = i
 			flush()
+
 			return
 		}
 
@@ -168,11 +186,12 @@ export function extractBlocks(source: string, syntax: CommentSyntax): CommentBlo
 			start = i + 1
 			isDoc = info.isDoc
 		}
+
 		current.push(info.text)
 		endIndex = i + 1
 
 		if (syntax === 'c') {
-			if (!inBlockComment && /^\/\*/.test(trimmed) && !trimmed.includes('*/')) {
+			if (!inBlockComment && trimmed.startsWith('/*') && !trimmed.includes('*/')) {
 				inBlockComment = true
 			} else if (inBlockComment && trimmed.includes('*/')) {
 				inBlockComment = false
@@ -181,6 +200,7 @@ export function extractBlocks(source: string, syntax: CommentSyntax): CommentBlo
 	})
 
 	flush()
+
 	return blocks
 }
 
@@ -192,10 +212,14 @@ export function extractBlocks(source: string, syntax: CommentSyntax): CommentBlo
 function codeBelow(lines: string[], from: number, syntax: CommentSyntax): string | null {
 	for (let i = from; i < Math.min(lines.length, from + 4); i++) {
 		const trimmed = lines[i].trim()
+
 		if (!trimmed) continue
+
 		if (classify(lines[i], syntax)) return null
+
 		return trimmed.length > 160 ? `${trimmed.slice(0, 157)}...` : trimmed
 	}
+
 	return null
 }
 

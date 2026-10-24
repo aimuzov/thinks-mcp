@@ -5,7 +5,7 @@ import { loadConfig, type Config } from '#thinks/config'
 import { CorpusRef } from '#thinks/mcp/context'
 
 /** What a user can change from the account page. */
-export interface UserSettings {
+export type UserSettings = {
 	/** Same format as THINKS_NEVER_MARKS: `—:--,…:...` */
 	neverMarks: string
 	/** Same format as THINKS_CHAT_STOPLIST: chat names, comma-separated. */
@@ -41,6 +41,7 @@ export class Users {
 
 	dir(userId: string): string {
 		if (!/^\d+$/.test(userId)) throw new Error(`Bad user id: ${userId}`)
+
 		return join(this.dataDir, 'users', userId)
 	}
 
@@ -55,8 +56,11 @@ export class Users {
 
 	settings(userId: string): UserSettings {
 		const path = join(this.dir(userId), 'settings.json')
+
 		if (!existsSync(path)) return { ...DEFAULT_SETTINGS }
+
 		const saved = JSON.parse(readFileSync(path, 'utf8')) as Partial<UserSettings>
+
 		return { ...DEFAULT_SETTINGS, ...saved }
 	}
 
@@ -70,6 +74,7 @@ export class Users {
 	/** The same Config the CLI builds from env, pointed at this user's files. */
 	config(userId: string): Config {
 		const s = this.settings(userId)
+
 		return loadConfig({
 			THINKS_DATA_DIR: this.dir(userId),
 			THINKS_NEVER_MARKS: s.neverMarks,
@@ -85,18 +90,22 @@ export class Users {
 
 	corpus(userId: string): CorpusRef {
 		let ref = this.open.get(userId)
+
 		if (ref) {
 			// Re-insert to mark it as most recently used.
 			this.open.delete(userId)
 		} else {
 			ref = new CorpusRef(this.config(userId))
 		}
+
 		this.open.set(userId, ref)
 
 		if (this.open.size > OPEN_CORPORA) {
 			const [oldest] = this.open.keys()
+
 			this.release(oldest!)
 		}
+
 		return ref
 	}
 

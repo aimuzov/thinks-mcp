@@ -11,7 +11,7 @@
 		"verbatimModuleSyntax": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
-		"customConditions": ["development"]
+		"customConditions": ["thinks-source"]
 	},
 	"include": ["src"]
 }

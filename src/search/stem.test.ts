@@ -17,7 +17,8 @@ describe('stemRussian', () => {
 	for (const family of FAMILIES) {
 		it(`collapses ${family[0]} and its forms`, () => {
 			const stems = new Set(family.map(stemRussian))
-			assert.equal([...stems].length, 1)
+
+			assert.equal(stems.size, 1)
 		})
 	}
 
@@ -43,7 +44,7 @@ const ENGLISH_FAMILIES: string[][] = [
 describe('stemEnglish', () => {
 	for (const family of ENGLISH_FAMILIES) {
 		it(`collapses ${family[0]} and its forms`, () => {
-			assert.equal([...new Set(family.map(stemEnglish))].length, 1)
+			assert.equal(new Set(family.map(stemEnglish)).size, 1)
 		})
 	}
 

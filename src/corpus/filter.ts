@@ -31,10 +31,13 @@ const MAX_LINKS = 3
  */
 export function reject(m: ParsedMessage, ownerId: string): RejectReason | null {
 	if (m.fromId !== ownerId) return 'not-owner'
+
 	if (m.isForwarded) return 'forwarded'
+
 	if (m.isViaBot) return 'via-bot'
 
 	const text = m.text.trim()
+
 	if (!text) return 'empty'
 
 	if (text.startsWith('{') || text.startsWith('[') || text.startsWith('<')) {
@@ -42,11 +45,15 @@ export function reject(m: ParsedMessage, ownerId: string): RejectReason | null {
 	}
 
 	let structural = 0
+
 	for (const ch of text) if (STRUCTURAL_CHARS.has(ch)) structural++
+
 	if (structural / text.length > MAX_STRUCTURAL_SHARE) return 'structured'
 
 	let links = 0
+
 	for (const e of m.entities) if (e.type === 'link' || e.type === 'text_link') links++
+
 	if (links > MAX_LINKS) return 'link-spam'
 
 	return null
@@ -58,5 +65,6 @@ export function reject(m: ParsedMessage, ownerId: string): RejectReason | null {
  */
 export function hasSubstance(sanitized: string): boolean {
 	const withoutPlaceholders = sanitized.replace(/<[^>]{1,12}>|@собеседник/g, '')
+
 	return /\p{L}/u.test(withoutPlaceholders)
 }

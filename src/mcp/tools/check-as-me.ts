@@ -1,14 +1,14 @@
+import { failure, text } from '@aimuzov/infra-mcp-kit'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { Register } from '#thinks/corpus/types'
-import { briefResult, errorResult } from '#thinks/mcp/brief'
 import { CORPUS_MISSING, type ToolContext } from '#thinks/mcp/context'
 import { checkText, renderCheck } from '#thinks/style/check'
 
 import { registerSchema } from './shared.ts'
 
-export interface CheckInput {
+export type CheckInput = {
 	text: string
 	register?: Register
 	code?: string
@@ -44,11 +44,13 @@ export function registerCheckAsMe(server: McpServer, ctx: ToolContext) {
 		},
 		async (args: CheckInput) => {
 			const corpus = ctx.corpus.get()
-			if (!corpus) return errorResult(CORPUS_MISSING)
+
+			if (!corpus) return failure(CORPUS_MISSING)
 
 			const report = checkText(args.text, corpus.profile, args.register ?? 'dm', args.code)
+
 			return {
-				...briefResult(renderCheck(report)),
+				...text(renderCheck(report)),
 				structuredContent: report as unknown as Record<string, unknown>,
 			}
 		},

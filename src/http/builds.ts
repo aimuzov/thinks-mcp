@@ -7,13 +7,13 @@ import type { Users } from './users.ts'
 
 export type BuildState = 'queued' | 'building' | 'ready' | 'failed'
 
-export interface BuildStatus {
+export type BuildStatus = {
 	state: BuildState
 	message: string
 	updatedAt: number
 }
 
-export interface BuildJob {
+export type BuildJob = {
 	dataDir: string
 	userId: string
 	dumpPath: string
@@ -23,7 +23,11 @@ export interface BuildJob {
 /** Runs one build; resolves with the error text, or null on success. */
 export type BuildRunner = (job: BuildJob) => Promise<string | null>
 
-const WORKER = fileURLToPath(new URL('./buildWorker.js', import.meta.url))
+// From the sources the worker is a .ts file, and it needs the same
+// `--conditions` to resolve `#thinks/*`.
+const FROM_SOURCE = import.meta.url.endsWith('.ts')
+const WORKER = fileURLToPath(new URL(FROM_SOURCE ? './build-worker.ts' : './build-worker.js', import.meta.url))
+const CONDITIONS = process.execArgv.filter((arg) => arg.startsWith('--conditions'))
 
 /** The default runner: the worker in a child process with a capped heap. */
 export function childRunner(heapMb: number): BuildRunner {
@@ -31,15 +35,27 @@ export function childRunner(heapMb: number): BuildRunner {
 		new Promise((resolve) => {
 			const child = spawn(
 				process.execPath,
-				[`--max-old-space-size=${heapMb}`, WORKER, job.dataDir, job.userId, job.dumpPath, job.dbPath],
+				[
+					...CONDITIONS,
+					`--max-old-space-size=${heapMb}`,
+					WORKER,
+					job.dataDir,
+					job.userId,
+					job.dumpPath,
+					job.dbPath,
+				],
 				{ stdio: ['ignore', 'ignore', 'pipe'] },
 			)
 			let lastLine = ''
+
 			child.stderr.setEncoding('utf8')
+
 			child.stderr.on('data', (chunk: string) => {
 				const lines = chunk.trim().split('\n')
+
 				lastLine = lines[lines.length - 1] || lastLine
 			})
+
 			child.on('close', (code) => {
 				if (code === 0) resolve(null)
 				else if (code === null) resolve('Сборке не хватило памяти')
@@ -81,13 +97,16 @@ export class Builds {
 
 	status(userId: string): BuildStatus | null {
 		const path = this.statusPath(userId)
+
 		if (!existsSync(path)) return null
+
 		return JSON.parse(readFileSync(path, 'utf8')) as BuildStatus
 	}
 
 	/** Queue a build of the export already saved at dumpPath(userId). */
 	enqueue(userId: string): void {
 		if (this.queue.includes(userId)) return
+
 		this.queue.push(userId)
 		this.setStatus(userId, 'queued', 'В очереди')
 		void this.next()
@@ -100,6 +119,7 @@ export class Builds {
 	recover(userIds: string[]): void {
 		for (const id of userIds) {
 			const s = this.status(id)
+
 			if (s && (s.state === 'queued' || s.state === 'building')) {
 				this.setStatus(id, 'failed', 'Сервер перезапустился, загрузи заново')
 				rmSync(this.dumpPath(id), { force: true })
@@ -116,12 +136,16 @@ export class Builds {
 
 	private async next(): Promise<void> {
 		if (this.running) return
+
 		const userId = this.queue.shift()
+
 		if (!userId) return
+
 		this.running = true
 
 		const target = this.users.config(userId).dbPath
 		const tmp = `${target}.building`
+
 		try {
 			this.setStatus(userId, 'building', 'Собираю корпус')
 			removeDb(tmp)
@@ -131,6 +155,7 @@ export class Builds {
 				dumpPath: this.dumpPath(userId),
 				dbPath: tmp,
 			})
+
 			if (error) {
 				removeDb(tmp)
 				this.setStatus(userId, 'failed', error)
@@ -157,6 +182,7 @@ export class Builds {
 
 	private setStatus(userId: string, state: BuildState, message: string) {
 		const status: BuildStatus = { state, message, updatedAt: Date.now() }
+
 		writeFileSync(this.statusPath(userId), JSON.stringify(status))
 	}
 }

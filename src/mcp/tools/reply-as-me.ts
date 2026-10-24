@@ -1,14 +1,15 @@
+import { failure, text } from '@aimuzov/infra-mcp-kit'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { Register } from '#thinks/corpus/types'
-import { briefResult, errorResult, renderBrief } from '#thinks/mcp/brief'
+import { renderBrief } from '#thinks/mcp/brief'
 import { CORPUS_MISSING, type Corpus, type ToolContext } from '#thinks/mcp/context'
 import { pairStats, searchTurns, type PairStats, type TurnRow } from '#thinks/search/query'
 
 import { DEFAULT_EXAMPLES, examplesSchema, registerSchema } from './shared.ts'
 
-export interface ReplyInput {
+export type ReplyInput = {
 	incoming: string
 	hint?: string
 	register?: Register
@@ -38,14 +39,18 @@ export function buildReplyBrief(corpus: Corpus, input: ReplyInput): string {
 	// Top up with topically similar turns when the archive has few comparable
 	// exchanges, so the brief still shows how he talks about this subject.
 	const examples: TurnRow[] = [...pairs]
+
 	if (pairs.length < limit) {
 		const seen = new Set(pairs.map((p) => p.id))
+
 		for (const row of searchTurns(corpus.db, input.incoming, {
 			register,
 			limit,
 		})) {
 			if (examples.length >= limit) break
+
 			if (seen.has(row.id)) continue
+
 			seen.add(row.id)
 			examples.push(row)
 		}
@@ -91,12 +96,14 @@ function pairQuality(examples: TurnRow[], limit: number, stats: PairStats): stri
 	}
 
 	const out: string[] = []
+
 	if (pairs.length < limit) {
 		out.push(
 			`Настоящих пар нашлось ${pairs.length} из ${limit}; остальные примеры ` +
 				'подобраны по теме и ответами на это сообщение не являются.',
 		)
 	}
+
 	if (!quoted) {
 		out.push(
 			'Все пары ниже восстановлены по порядку сообщений, а не по явной ' +
@@ -104,6 +111,7 @@ function pairQuality(examples: TurnRow[], limit: number, stats: PairStats): stri
 				'ориентируйся на тон, а не на то, что именно отвечено.',
 		)
 	}
+
 	return out
 }
 
@@ -128,8 +136,10 @@ export function registerReplyAsMe(server: McpServer, ctx: ToolContext) {
 		},
 		async (args: ReplyInput) => {
 			const corpus = ctx.corpus.get()
-			if (!corpus) return errorResult(CORPUS_MISSING)
-			return briefResult(buildReplyBrief(corpus, args))
+
+			if (!corpus) return failure(CORPUS_MISSING)
+
+			return text(buildReplyBrief(corpus, args))
 		},
 	)
 }

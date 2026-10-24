@@ -9,16 +9,18 @@ import { Users } from './users.ts'
  * In its own process it gets its own heap limit, and running out of it kills
  * the build instead of the server everyone is connected to.
  *
- * Usage: buildWorker.js <data dir> <user id> <dump path> <target db path>
+ * Usage: build-worker.js <data dir> <user id> <dump path> <target db path>
  */
 const [dataDir, userId, dumpPath, dbPath] = process.argv.slice(2)
+
 if (!dataDir || !userId || !dumpPath || !dbPath) {
-	console.error('usage: buildWorker.js <data dir> <user id> <dump> <db>')
+	console.error('usage: build-worker.js <data dir> <user id> <dump> <db>')
 	process.exit(2)
 }
 
 try {
 	const cfg = { ...new Users(dataDir).config(userId), dumpPath, dbPath }
+
 	buildCorpus(cfg, (msg) => console.error(msg), {
 		expectOwnerId: `user${userId}`,
 	})

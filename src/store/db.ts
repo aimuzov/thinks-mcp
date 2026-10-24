@@ -76,7 +76,9 @@ const ADDED_COLUMNS: { table: string; column: string; type: string }[] = [
 function migrate(db: Db): void {
 	for (const { table, column, type } of ADDED_COLUMNS) {
 		const columns = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[]
+
 		if (columns.some((c) => c.name === column)) continue
+
 		run(db, `ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
 	}
 
@@ -89,9 +91,13 @@ function migrate(db: Db): void {
 
 export function openDb(path: string): Db {
 	const db = new DatabaseSync(path)
+
 	db.prepare('PRAGMA journal_mode = WAL').get()
+
 	for (const stmt of SCHEMA) run(db, stmt)
+
 	migrate(db)
+
 	return db
 }
 
@@ -103,6 +109,7 @@ export function openDb(path: string): Db {
  */
 export function resetRegisters(db: Db, registers: string[]): void {
 	const placeholders = registers.map(() => '?').join(', ')
+
 	db.prepare(`DELETE FROM turn WHERE register IN (${placeholders})`).run(...registers)
 }
 
@@ -129,14 +136,18 @@ export function rebuildIndexes(db: Db, stems: (text: string) => string): void {
 	const insertContext = db.prepare('INSERT INTO ctx_fts (rowid, stems) VALUES (?, ?)')
 
 	run(db, 'BEGIN')
+
 	try {
 		for (const row of rows) {
 			insertText.run(row.id, stems(row.text))
+
 			if (row.context_in) insertContext.run(row.id, stems(row.context_in))
 		}
+
 		run(db, 'COMMIT')
 	} catch (err) {
 		run(db, 'ROLLBACK')
+
 		throw err
 	}
 }
@@ -144,6 +155,7 @@ export function rebuildIndexes(db: Db, stems: (text: string) => string): void {
 /** Next free turn id, so two corpora can coexist in one table. */
 export function nextTurnId(db: Db): number {
 	const row = db.prepare('SELECT COALESCE(MAX(id), 0) AS max FROM turn').get() as { max: number } | undefined
+
 	return (row?.max ?? 0) + 1
 }
 
@@ -155,5 +167,6 @@ export function setMeta(db: Db, key: string, value: string): void {
 
 export function getMeta(db: Db, key: string): string | null {
 	const row = db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined
+
 	return row?.value ?? null
 }

@@ -1,6 +1,6 @@
 import type { Turn } from '#thinks/corpus/types'
 
-export interface AntiPattern {
+export type AntiPattern = {
 	label: string
 	/** How many messages out of the corpus contain it. */
 	hits: number
@@ -20,7 +20,7 @@ export interface AntiPattern {
  */
 export const word = (body: string) => new RegExp(`(?<!\\p{L})(?:${body})(?!\\p{L})`, 'iu')
 
-export interface Probe {
+export type Probe = {
 	label: string
 	test: RegExp
 }
@@ -94,7 +94,9 @@ const MARKDOWN_LABELS = ['markdown-жирный **']
  */
 function habitShare(patterns: AntiPattern[], labels: string[]): number | undefined {
 	const found = patterns.filter((a) => labels.includes(a.label))
+
 	if (!found.length) return undefined
+
 	return Math.max(...found.map((a) => a.share))
 }
 
@@ -109,7 +111,9 @@ function countProbes(probes: Probe[], texts: string[]): AntiPattern[] {
 	return probes
 		.map((probe) => {
 			let hits = 0
+
 			for (const text of texts) if (probe.test.test(text)) hits++
+
 			return {
 				label: probe.label,
 				hits,

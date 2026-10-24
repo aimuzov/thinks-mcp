@@ -25,6 +25,7 @@ describe('extractBlocks', () => {
 			['const a = 1', '', '// Первая строка мысли,', '// продолжение той же мысли.', 'const b = 2'].join('\n'),
 			'c',
 		)
+
 		assert.equal(blocks.length, 1)
 		assert.deepEqual(blocks[0].lines, ['Первая строка мысли,', 'продолжение той же мысли.'])
 		assert.equal(blocks[0].startLine, 3)
@@ -33,6 +34,7 @@ describe('extractBlocks', () => {
 
 	it('splits blocks separated by code', () => {
 		const blocks = extractBlocks(['// Один', 'const a = 1', '// Два'].join('\n'), 'c')
+
 		assert.deepEqual(
 			blocks.map((b) => b.lines[0]),
 			['Один', 'Два'],
@@ -51,6 +53,7 @@ describe('extractBlocks', () => {
 			].join('\n'),
 			'c',
 		)
+
 		assert.equal(blocks.length, 1)
 		assert.equal(blocks[0].isDoc, true)
 		assert.deepEqual(blocks[0].lines, ['Меняет backend-окружение.', '', '@param backendEnv Следующее значение.'])
@@ -58,12 +61,14 @@ describe('extractBlocks', () => {
 
 	it('handles a one-line block comment', () => {
 		const blocks = extractBlocks('/* Коротко. */\ncode()', 'c')
+
 		assert.deepEqual(blocks[0].lines, ['Коротко.'])
 		assert.equal(blocks[0].isDoc, false)
 	})
 
 	it('ignores trailing comments — they cannot be told from strings', () => {
 		const blocks = extractBlocks(["const url = 'https://example.com' // хвост", 'const b = 2'].join('\n'), 'c')
+
 		assert.equal(blocks.length, 0)
 	})
 
@@ -72,12 +77,14 @@ describe('extractBlocks', () => {
 			['#!/usr/bin/env fish', '', '# Настоящий комментарий.', 'echo hi'].join('\n'),
 			'hash',
 		)
+
 		assert.equal(blocks.length, 1)
 		assert.deepEqual(blocks[0].lines, ['Настоящий комментарий.'])
 	})
 
 	it('reads lua comments and marks --- as doc', () => {
 		const blocks = extractBlocks(['--- Док-строка.', 'local x = 1', '-- Обычная.'].join('\n'), 'lua')
+
 		assert.equal(blocks[0].isDoc, true)
 		assert.equal(blocks[1].isDoc, false)
 		assert.deepEqual(blocks[1].lines, ['Обычная.'])
@@ -85,6 +92,7 @@ describe('extractBlocks', () => {
 
 	it('keeps a multi-line /* */ block together', () => {
 		const blocks = extractBlocks(['/*', ' * Строка одна', ' * Строка два', ' */', 'code()'].join('\n'), 'c')
+
 		assert.equal(blocks.length, 1)
 		assert.deepEqual(blocks[0].lines, ['Строка одна', 'Строка два'])
 	})
@@ -95,16 +103,19 @@ describe('extractBlocks', () => {
 
 	it('attaches the line of code the comment sits above', () => {
 		const [block] = extractBlocks(['// Почему так.', 'export function f() {}'].join('\n'), 'c')
+
 		assert.equal(block.code, 'export function f() {}')
 	})
 
 	it('looks past a blank line to find that code', () => {
 		const [block] = extractBlocks(['// Заголовок секции', '', 'const a = 1'].join('\n'), 'c')
+
 		assert.equal(block.code, 'const a = 1')
 	})
 
 	it('leaves code null when the block ends the file', () => {
 		const [block] = extractBlocks('const a = 1\n// Хвостовой.', 'c')
+
 		assert.equal(block.code, null)
 	})
 })

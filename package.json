@@ -49,16 +49,16 @@
 		"provenance": true
 	},
 	"scripts": {
-		"start": "node --conditions=development src/index.ts",
-		"build": "rm -rf build && tsc -p tsconfig.build.json && chmod +x build/index.js",
+		"start": "node --conditions=thinks-source src/index.ts",
+		"build": "rm -rf build && tsc -p tsconfig.build.json && cp -R src/http/assets build/http/ && chmod +x build/index.js",
 		"typecheck": "tsc",
-		"test": "node --conditions=development --test 'src/**/*.test.ts'",
+		"test": "node --conditions=thinks-source --test 'src/**/*.test.ts'",
 		"format": "oxlint --fix && prettier --write .",
 		"format:check": "prettier --check .",
 		"lint": "oxlint --deny-warnings",
-		"corpus": "node --conditions=development --max-old-space-size=8192 src/index.ts build",
-		"profile": "node --conditions=development src/index.ts profile",
-		"where": "node --conditions=development src/index.ts where",
+		"corpus": "node --conditions=thinks-source --max-old-space-size=8192 src/index.ts build",
+		"profile": "node --conditions=thinks-source src/index.ts profile",
+		"where": "node --conditions=thinks-source src/index.ts where",
 		"prepack": "npm run build"
 	},
 	"dependencies": {
@@ -77,7 +77,7 @@
 	},
 	"imports": {
 		"#thinks/*": {
-			"development": "./src/*.ts",
+			"thinks-source": "./src/*.ts",
 			"default": "./build/*.js"
 		}
 	}

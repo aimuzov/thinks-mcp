@@ -2,13 +2,13 @@ import type { Config } from '#thinks/config'
 import { pseudonym } from '#thinks/corpus/parse'
 import { stemsOf } from '#thinks/search/stem'
 import { nextTurnId, openDb, rebuildIndexes, resetRegisters, run, setMeta } from '#thinks/store/db'
-import { measureCode } from '#thinks/style/codeMetrics'
+import { measureCode } from '#thinks/style/code-metrics'
 import { loadProfile, measureRegisters, saveCodeProfile } from '#thinks/style/profile'
 
 import { BlameCache } from './cache.ts'
 import { emptyScanStats, isRepo, scanRepo, type CodeComment } from './scan.ts'
 
-export interface CodeBuildReport {
+export type CodeBuildReport = {
 	repos: { repo: string; blocks: number }[]
 	blocks: number
 	inline: number
@@ -48,8 +48,10 @@ export function buildCodeCorpus(
 			log(`Пропускаю (не git-репозиторий): ${repo}`)
 			continue
 		}
+
 		stats.repos++
 		const found = scanRepo(repo, { emails }, stats, cache)
+
 		log(`${repo}: ${found.length}`)
 		comments.push(...found)
 	}
@@ -65,7 +67,9 @@ export function buildCodeCorpus(
 	)
 
 	let id = nextTurnId(db)
+
 	run(db, 'BEGIN')
+
 	try {
 		for (const c of comments) {
 			insert.run(
@@ -84,9 +88,11 @@ export function buildCodeCorpus(
 				c.code,
 			)
 		}
+
 		run(db, 'COMMIT')
 	} catch (err) {
 		run(db, 'ROLLBACK')
+
 		throw err
 	}
 
@@ -100,6 +106,7 @@ export function buildCodeCorpus(
 		cfg.codeHandwrittenUntil,
 	)
 	const recentFrom = new Date().getUTCFullYear() - cfg.recentYears + 1
+
 	saveCodeProfile(db, {
 		builtAt: new Date().toISOString(),
 		registers: measureRegisters(db, ['code', 'jsdoc']),
@@ -107,11 +114,13 @@ export function buildCodeCorpus(
 		recentFrom,
 		code,
 	})
+
 	setMeta(db, 'code_emails', emails.join(','))
 
 	// Real names live only in the returned report, which the CLI prints for the
 	// owner and nobody stores.
 	const byRepo = new Map<string, number>()
+
 	for (const c of comments) byRepo.set(c.repo, (byRepo.get(c.repo) ?? 0) + 1)
 
 	const report: CodeBuildReport = {
@@ -128,6 +137,7 @@ export function buildCodeCorpus(
 
 	// Loading it back is the cheapest proof that both halves still coexist.
 	const merged = loadProfile(db)
+
 	if (!merged?.code) {
 		throw new Error(
 			`Профиль кода не сохранился: в ${cfg.dbPath} после записи нет части ` +
@@ -136,6 +146,7 @@ export function buildCodeCorpus(
 	}
 
 	db.close()
+
 	return report
 }
 
@@ -153,8 +164,10 @@ export function formatCodeReport(r: CodeBuildReport): string {
 		'',
 		'По репозиториям:',
 	]
+
 	for (const repo of r.repos.slice(0, 20)) {
 		lines.push(`  ${repo.repo.padEnd(24)} ${n(repo.blocks)}`)
 	}
+
 	return lines.join('\n')
 }

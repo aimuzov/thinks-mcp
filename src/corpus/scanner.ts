@@ -40,24 +40,34 @@ export class JsonScanner {
 	/** Iterate an object's keys. The caller must consume each key's value. */
 	*entries(): Generator<string> {
 		if (this.skipNull()) return
+
 		this.expect(LBRACE)
+
 		if (this.consume(RBRACE)) return
+
 		do {
 			const key = this.value()
+
 			if (typeof key !== 'string') this.fail('ключ объекта')
+
 			this.expect(COLON)
 			yield key
 		} while (this.consume(COMMA))
+
 		this.expect(RBRACE)
 	}
 
 	/** Iterate an array. The caller must consume one value per step. */
 	*items(): Generator<void> {
 		if (this.skipNull()) return
+
 		this.expect(LBRACKET)
+
 		if (this.consume(RBRACKET)) return
+
 		do yield
 		while (this.consume(COMMA))
+
 		this.expect(RBRACKET)
 	}
 
@@ -75,8 +85,10 @@ export class JsonScanner {
 		this.offset += this.buf.length
 		const chunk = Buffer.allocUnsafe(this.chunkSize)
 		const n = readSync(this.fd, chunk, 0, this.chunkSize, null)
+
 		this.buf = chunk.subarray(0, n)
 		this.pos = 0
+
 		return n > 0
 	}
 
@@ -84,15 +96,20 @@ export class JsonScanner {
 	private peek(): number {
 		for (;;) {
 			if (this.pos >= this.buf.length && !this.refill()) return -1
+
 			const c = this.buf[this.pos]!
+
 			if (!isSpace(c)) return c
+
 			this.pos++
 		}
 	}
 
 	private consume(c: number): boolean {
 		if (this.peek() !== c) return false
+
 		this.pos++
+
 		return true
 	}
 
@@ -102,7 +119,9 @@ export class JsonScanner {
 
 	private skipNull(): boolean {
 		if (this.peek() !== 0x6e) return false
+
 		if (this.value() !== null) this.fail('null')
+
 		return true
 	}
 
@@ -116,7 +135,9 @@ export class JsonScanner {
 	 */
 	private scan(keep: boolean): Buffer {
 		const first = this.peek()
+
 		if (first === -1) this.fail('значение')
+
 		const scalar = first !== LBRACE && first !== LBRACKET && first !== QUOTE
 		const parts: Buffer[] = []
 		let start = this.pos
@@ -127,26 +148,35 @@ export class JsonScanner {
 		for (;;) {
 			if (this.pos >= this.buf.length) {
 				if (keep) parts.push(this.buf.subarray(start))
+
 				if (!this.refill()) {
 					if (scalar) break
+
 					this.fail('конец значения')
 				}
+
 				start = 0
 			}
+
 			const c = this.buf[this.pos]!
+
 			if (inString) {
 				this.pos++
+
 				if (escaped) escaped = false
 				else if (c === BACKSLASH) escaped = true
 				else if (c === QUOTE) {
 					inString = false
+
 					if (depth === 0) break
 				}
 			} else if (scalar) {
 				if (c === COMMA || c === RBRACE || c === RBRACKET || isSpace(c)) break
+
 				this.pos++
 			} else {
 				this.pos++
+
 				if (c === QUOTE) inString = true
 				else if (c === LBRACE || c === LBRACKET) depth++
 				else if ((c === RBRACE || c === RBRACKET) && --depth === 0) break
@@ -154,7 +184,9 @@ export class JsonScanner {
 		}
 
 		if (!keep) return Buffer.alloc(0)
+
 		parts.push(this.buf.subarray(start, this.pos))
+
 		return parts.length === 1 ? parts[0]! : Buffer.concat(parts)
 	}
 }

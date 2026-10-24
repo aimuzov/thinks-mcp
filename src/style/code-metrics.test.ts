@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { measureCode, splitMarkers, type CodeBlockInput } from './codeMetrics.ts'
+import { measureCode, splitMarkers, type CodeBlockInput } from './code-metrics.ts'
 
 const block = (lines: string[], extra: Partial<CodeBlockInput> = {}): CodeBlockInput => ({
 	repo: 'repo-a',
@@ -31,6 +31,7 @@ describe('measureCode', () => {
 	it('counts causal connectives, which is what makes a comment explain', () => {
 		const m = measureCode([block(['Так сделано потому что иначе ломается сборка.']), block(['Просто факт.'])])
 		const phrases = m.connectives.map((c) => c.phrase)
+
 		assert.ok(phrases.includes('потому что'))
 		assert.ok(phrases.includes('иначе'))
 	})
@@ -42,6 +43,7 @@ describe('measureCode', () => {
 			block(['FIXME: чужой маркер']),
 		])
 		const byName = Object.fromEntries(m.markers.map((x) => [x.name, x.count]))
+
 		assert.equal(byName.TODO, 1)
 		assert.equal(byName.NOTE, 1)
 		assert.equal(byName.FIXME, 1)
@@ -54,6 +56,7 @@ describe('measureCode', () => {
 			block(['FIXME: чужой маркер']),
 		])
 		const { own, foreign } = splitMarkers(m)
+
 		assert.deepEqual(own, ['TODO', 'NOTE'])
 		assert.ok(foreign.includes('FIXME'))
 		assert.ok(foreign.includes('IMPORTANT'))
@@ -68,6 +71,7 @@ describe('measureCode', () => {
 			block(['Русский комментарий.']),
 			block(['English comment here.'], { lang: 'en', repo: 'repo-b' }),
 		])
+
 		assert.equal(m.russian, 0.5)
 		assert.deepEqual(m.repos.map((r) => r.repo).sort(), ['repo-a', 'repo-b'])
 	})
@@ -93,12 +97,14 @@ describe('measureCode', () => {
 			block(['Ещё до всего.'], { year: 2023 }),
 			...Array.from({ length: 300 }, () => block(['Свежее.'], { year: 2026 })),
 		]
+
 		assert.equal(measureCode(blocks, 2026).typography?.code, undefined)
 		assert.notEqual(measureCode(blocks).typography?.code, undefined)
 	})
 
 	it('survives an empty corpus', () => {
 		const m = measureCode([])
+
 		assert.equal(m.blocks, 0)
 		assert.equal(m.genres.code.lineWidth.median, 0)
 	})

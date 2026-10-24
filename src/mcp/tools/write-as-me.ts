@@ -1,14 +1,15 @@
+import { failure, text } from '@aimuzov/infra-mcp-kit'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { Register } from '#thinks/corpus/types'
-import { briefResult, errorResult, renderBrief } from '#thinks/mcp/brief'
+import { renderBrief } from '#thinks/mcp/brief'
 import { CORPUS_MISSING, type Corpus, type ToolContext } from '#thinks/mcp/context'
 import { searchTurns } from '#thinks/search/query'
 
 import { DEFAULT_EXAMPLES, examplesSchema, langSchema, lengthBounds, registerSchema } from './shared.ts'
 
-export interface WriteInput {
+export type WriteInput = {
 	brief: string
 	register?: Register
 	lang?: 'ru' | 'en'
@@ -60,8 +61,10 @@ export function registerWriteAsMe(server: McpServer, ctx: ToolContext) {
 		},
 		async (args: WriteInput) => {
 			const corpus = ctx.corpus.get()
-			if (!corpus) return errorResult(CORPUS_MISSING)
-			return briefResult(buildWriteBrief(corpus, args))
+
+			if (!corpus) return failure(CORPUS_MISSING)
+
+			return text(buildWriteBrief(corpus, args))
 		},
 	)
 }

@@ -1,21 +1,19 @@
-import { createRequire } from 'node:module'
+import { readVersion } from '@aimuzov/infra-mcp-kit'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { ensureDataDir, type Config } from '#thinks/config'
 
 import { CorpusRef, type ToolContext } from './context.ts'
 import { registerPrompts } from './prompts.ts'
 import { registerResources } from './resources.ts'
-import { registerCheckAsMe } from './tools/checkAsMe.ts'
-import { registerFindMyMessages } from './tools/findMyMessages.ts'
-import { registerRephraseAsMe } from './tools/rephraseAsMe.ts'
-import { registerReplyAsMe } from './tools/replyAsMe.ts'
-import { registerWriteAsMe } from './tools/writeAsMe.ts'
+import { registerCheckAsMe } from './tools/check-as-me.ts'
+import { registerFindMyMessages } from './tools/find-my-messages.ts'
+import { registerRephraseAsMe } from './tools/rephrase-as-me.ts'
+import { registerReplyAsMe } from './tools/reply-as-me.ts'
+import { registerWriteAsMe } from './tools/write-as-me.ts'
 import { voiceInstructions } from './voice.ts'
 
-// Read at runtime so the MCP handshake can never report a stale version.
-const { version: VERSION } = createRequire(import.meta.url)('../../package.json') as { version: string }
+const VERSION = readVersion(import.meta.url)
 
 /**
  * Build a fully-wired MCP server.
@@ -45,11 +43,4 @@ export function createServer(cfg: Config, corpus: CorpusRef = new CorpusRef(cfg)
 	registerPrompts(server, ctx)
 
 	return server
-}
-
-/** Run the MCP server over stdio. */
-export async function serve(cfg: Config): Promise<void> {
-	const server = createServer(cfg)
-	await server.connect(new StdioServerTransport())
-	console.error('thinks-mcp running on stdio')
 }

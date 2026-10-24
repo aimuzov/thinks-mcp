@@ -39,6 +39,7 @@ export class BlameCache implements ScanCache {
 
 	set(repo: string, path: string, entry: CachedFile): void {
 		const key = keyOf(repo, path)
+
 		this.entries.set(key, entry)
 		this.dirty.add(key)
 	}
@@ -58,18 +59,25 @@ export class BlameCache implements ScanCache {
 		)
 
 		run(this.db, 'BEGIN')
+
 		try {
 			for (const key of this.dirty) {
 				const entry = this.entries.get(key)
+
 				if (!entry) continue
+
 				const [repo, path] = splitKey(key)
+
 				upsert.run(repo, path, entry.blob, JSON.stringify(entry.comments))
 			}
+
 			run(this.db, 'COMMIT')
 		} catch (err) {
 			run(this.db, 'ROLLBACK')
+
 			throw err
 		}
+
 		this.dirty.clear()
 	}
 }

@@ -11,6 +11,7 @@ import { stemsOf } from './stem.ts'
 function turn(partial: Partial<Turn> & { text: string }): Turn {
 	const parts = partial.parts ?? [partial.text]
 	const text = parts.join('\n')
+
 	return {
 		chatKey: 'chat-aaa',
 		register: 'dm',
@@ -64,6 +65,7 @@ describe('buildMatch', () => {
 
 	it('quotes each token and joins with OR', () => {
 		const match = buildMatch('машину забрал')
+
 		assert.match(match ?? '', /^"[^"]+" OR "[^"]+"$/)
 	})
 })
@@ -71,6 +73,7 @@ describe('buildMatch', () => {
 describe('searchTurns', () => {
 	it('matches across inflections', () => {
 		const [top] = searchTurns(db, 'встреча', { limit: 3 })
+
 		assert.match(top.text, /[Вв]стреч/)
 	})
 
@@ -79,6 +82,7 @@ describe('searchTurns', () => {
 			register: 'group',
 			limit: 5,
 		})
+
 		assert.equal(
 			rows.every((r) => r.register === 'group'),
 			true,
@@ -87,11 +91,13 @@ describe('searchTurns', () => {
 
 	it('collapses near-duplicates that differ only in case and punctuation', () => {
 		const rows = searchTurns(db, 'ок', { limit: 10 })
+
 		assert.equal(rows.filter((r) => /^ок\.?$/i.test(r.text)).length, 1)
 	})
 
 	it('never returns an empty brief, even for an unmatchable query', () => {
 		const rows = searchTurns(db, 'квантовая хромодинамика', { limit: 4 })
+
 		assert.ok(rows.length > 0)
 	})
 
@@ -101,6 +107,7 @@ describe('searchTurns', () => {
 			requireContext: true,
 			limit: 3,
 		})
+
 		assert.equal(rows[0]?.contextIn, 'Когда будет готова машина?')
 	})
 })
@@ -119,6 +126,7 @@ describe('pair confidence', () => {
 
 	it('ranks a quoted pair above an inferred one', () => {
 		const fresh = openDb(':memory:')
+
 		// Inferred first, so order alone cannot explain the result.
 		seed(fresh, [inferred, quoted], new Set())
 
@@ -127,16 +135,19 @@ describe('pair confidence', () => {
 			requireContext: true,
 			limit: 2,
 		})
+
 		assert.equal(top.contextExplicit, true)
 	})
 
 	it('leaves ranking alone when searching the owner own turns', () => {
 		const fresh = openDb(':memory:')
+
 		seed(fresh, [inferred, quoted], new Set())
 
 		// Matching against what the owner said: there is no pair to judge, so the
 		// penalty must not apply and relevance decides.
 		const [top] = searchTurns(fresh, 'случайная реплика', { limit: 2 })
+
 		assert.equal(top.text, 'Случайная реплика не по теме.')
 	})
 })
@@ -162,6 +173,7 @@ describe('two corpora in one database', () => {
 			register: 'code' as never,
 			limit: 5,
 		})
+
 		assert.equal(found[0]?.text, 'Почему выбран этот таймаут.')
 		assert.equal(found[0]?.chatKey, 'my-repo')
 	})
@@ -171,6 +183,7 @@ describe('two corpora in one database', () => {
 		rebuildIndexes(db, stemsOf)
 
 		const found = searchTurns(db, 'таймаут', { register: 'dm', limit: 5 })
+
 		assert.equal(
 			found.every((r) => r.register === 'dm'),
 			true,
@@ -184,6 +197,7 @@ describe('two corpora in one database', () => {
 			chatKey: 'my-repo',
 			lang: 'en',
 		})
+
 		insertTurns(db, [codeTurn, english], new Set())
 		rebuildIndexes(db, stemsOf)
 
@@ -192,6 +206,7 @@ describe('two corpora in one database', () => {
 			lang: 'ru',
 			limit: 5,
 		})
+
 		assert.equal(
 			ru.every((r) => r.lang === 'ru'),
 			true,
@@ -203,6 +218,7 @@ describe('holdout', () => {
 	it('stores held-out turns but keeps them out of the index', () => {
 		const fresh = openDb(':memory:')
 		const ids = pickHoldout(CORPUS, 1)
+
 		seed(fresh, CORPUS, ids)
 
 		assert.equal(holdoutTurns(fresh).length, 1)
@@ -210,6 +226,7 @@ describe('holdout', () => {
 		const found = searchTurns(fresh, 'ответ вопрос сроки', {
 			limit: 10,
 		})
+
 		assert.equal(
 			found.some((r) => r.text === 'Ответ на вопрос про сроки.'),
 			false,

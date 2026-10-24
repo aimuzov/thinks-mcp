@@ -3,7 +3,7 @@ import type { Db } from '#thinks/store/db'
 
 import { tokenize } from './stem.ts'
 
-export interface TurnRow {
+export type TurnRow = {
 	id: number
 	register: string
 	longform: number
@@ -22,7 +22,7 @@ export interface TurnRow {
 	score?: number
 }
 
-export interface SearchOptions {
+export type SearchOptions = {
 	register?: Register
 	/** Only meaningful for code registers, where both languages are used. */
 	lang?: 'ru' | 'en'
@@ -92,9 +92,11 @@ export function buildMatch(text: string): string | null {
 
 	for (const token of tokenize(text)) {
 		if (STOP_WORDS.has(token) || seen.has(token)) continue
+
 		seen.add(token)
 		tokens.push(token)
 	}
+
 	if (!tokens.length) return null
 
 	// Longer stems are the more contentful ones; keep those when trimming.
@@ -116,19 +118,24 @@ function filters(opts: SearchOptions): { sql: string; params: unknown[] } {
 		clauses.push('t.register = ?')
 		params.push(opts.register)
 	}
+
 	if (opts.lang) {
 		clauses.push('t.lang = ?')
 		params.push(opts.lang)
 	}
+
 	if (opts.requireContext) clauses.push("t.context_in IS NOT NULL AND t.context_in <> ''")
+
 	if (opts.yearFrom != null) {
 		clauses.push('t.year >= ?')
 		params.push(opts.yearFrom)
 	}
+
 	if (opts.minChars != null) {
 		clauses.push('t.chars >= ?')
 		params.push(opts.minChars)
 	}
+
 	if (opts.maxChars != null) {
 		clauses.push('t.chars <= ?')
 		params.push(opts.maxChars)
@@ -137,7 +144,7 @@ function filters(opts: SearchOptions): { sql: string; params: unknown[] } {
 	return { sql: clauses.join(' AND '), params }
 }
 
-interface RawRow {
+type RawRow = {
 	id: number
 	register: string
 	longform: number
@@ -214,6 +221,7 @@ export function searchTurns(db: Db, query: string, opts: SearchOptions = {}): Tu
         ORDER BY rank
         LIMIT ?`,
 		)
+
 		collector.add(asRows(statement.all(penalty, now, match, ...(params as never[]), limit * 3)).map(toRow))
 	}
 
@@ -242,8 +250,11 @@ class Collector {
 	add(candidates: TurnRow[]): void {
 		for (const row of candidates) {
 			if (this.full) return
+
 			const key = normalizeKey(row.text)
+
 			if (this.seen.has(key)) continue
+
 			this.seen.add(key)
 			this.rows.push(row)
 		}
@@ -254,6 +265,7 @@ class Collector {
 export function sampleTurns(db: Db, opts: SearchOptions = {}, limit = 20): TurnRow[] {
 	const { sql: where, params } = filters(opts)
 	const statement = db.prepare(`SELECT ${COLUMNS} FROM turn t WHERE ${where} ORDER BY RANDOM() LIMIT ?`)
+
 	return dedupe(asRows(statement.all(...(params as never[]), limit)).map(toRow))
 }
 
@@ -261,15 +273,17 @@ export function sampleTurns(db: Db, opts: SearchOptions = {}, limit = 20): TurnR
 export function allTurns(db: Db, opts: SearchOptions = {}): TurnRow[] {
 	const { sql: where, params } = filters(opts)
 	const statement = db.prepare(`SELECT ${COLUMNS} FROM turn t WHERE ${where}`)
+
 	return asRows(statement.all(...(params as never[]))).map(toRow)
 }
 
 export function getTurn(db: Db, id: number): TurnRow | null {
 	const row = db.prepare(`SELECT ${COLUMNS} FROM turn t WHERE t.id = ?`).get(id)
+
 	return row ? toRow(asRows([row])[0]) : null
 }
 
-export interface PairStats {
+export type PairStats = {
 	turns: number
 	pairs: number
 	quoted: number
@@ -298,6 +312,7 @@ export function pairStats(db: Db, register: Register = 'dm'): PairStats {
 
 	const turns = row?.turns ?? 0
 	const pairs = row?.pairs ?? 0
+
 	return {
 		turns,
 		pairs,
@@ -311,6 +326,7 @@ export function holdoutTurns(db: Db, limit = 20): TurnRow[] {
 	const rows = db
 		.prepare(`SELECT ${COLUMNS} FROM turn t WHERE t.holdout = 1 ORDER BY t.id LIMIT ?`)
 		.all(limit) as unknown as RawRow[]
+
 	return rows.map(toRow)
 }
 
@@ -322,12 +338,16 @@ export function holdoutTurns(db: Db, limit = 20): TurnRow[] {
 function dedupe(rows: TurnRow[]): TurnRow[] {
 	const seen = new Set<string>()
 	const out: TurnRow[] = []
+
 	for (const row of rows) {
 		const key = normalizeKey(row.text)
+
 		if (seen.has(key)) continue
+
 		seen.add(key)
 		out.push(row)
 	}
+
 	return out
 }
 

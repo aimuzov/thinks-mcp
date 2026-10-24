@@ -32,6 +32,7 @@ function run(repo: string, args: string[], email?: string) {
  */
 function makeRepo(): string {
 	const dir = mkdtempSync(join(tmpdir(), 'thinks-scan-'))
+
 	run(dir, ['init', '-q'])
 
 	writeFileSync(
@@ -53,6 +54,7 @@ function makeRepo(): string {
 			'const d = 4',
 		].join('\n'),
 	)
+
 	writeFileSync(join(dir, 'notes.md'), '# Не индексируем markdown\n')
 	run(dir, ['add', '.'])
 	run(dir, ['commit', '-qm', 'mine'], ME)
@@ -75,6 +77,7 @@ before(() => {
 describe('scanRepo', () => {
 	it('keeps the owner comments', () => {
 		const texts = found.map((c) => c.text)
+
 		assert.ok(texts.includes('Мой комментарий про причину.\nВторая строка той же мысли.'))
 		assert.ok(texts.includes('Док-блок автора.'))
 	})
@@ -86,6 +89,7 @@ describe('scanRepo', () => {
 	it('marks doc blocks apart from inline ones', () => {
 		const doc = found.find((c) => c.text.includes('Док-блок'))
 		const inline = found.find((c) => c.text.includes('Мой комментарий'))
+
 		assert.equal(doc?.isDoc, true)
 		assert.equal(inline?.isDoc, false)
 	})
@@ -102,6 +106,7 @@ describe('scanRepo', () => {
 			found.every((c) => c.lang === 'ru'),
 			true,
 		)
+
 		assert.equal(
 			found.every((c) => c.year >= 2000),
 			true,
@@ -117,6 +122,7 @@ describe('scanRepo', () => {
 
 	it('counts what it skipped', () => {
 		const stats = emptyScanStats()
+
 		scanRepo(repo, { emails: [ME] }, stats)
 		assert.ok(stats.kept > 0)
 		assert.ok(stats.blocks >= stats.kept)
@@ -124,10 +130,12 @@ describe('scanRepo', () => {
 
 	it('drops section rules and commented-out code', () => {
 		const texts = found.map((c) => c.text)
+
 		assert.equal(
 			texts.some((t) => /^-+$/.test(t)),
 			false,
 		)
+
 		assert.equal(
 			texts.some((t) => t.includes('oldCall(')),
 			false,
@@ -142,13 +150,16 @@ describe('blame cache', () => {
 
 		const first = emptyScanStats()
 		const cold = scanRepo(repo, { emails: [ME] }, first, cache)
+
 		assert.ok(first.filesBlamed > 0)
 		assert.equal(first.filesCached, 0)
 
 		const second = emptyScanStats()
 		const warm = scanRepo(repo, { emails: [ME] }, second, cache)
+
 		assert.equal(second.filesBlamed, 0)
 		assert.equal(second.filesCached, first.filesBlamed)
+
 		assert.deepEqual(
 			warm.map((c) => c.text),
 			cold.map((c) => c.text),
@@ -158,14 +169,17 @@ describe('blame cache', () => {
 	it('survives a round trip through the database', () => {
 		const db = openDb(':memory:')
 		const writer = new BlameCache(db)
+
 		scanRepo(repo, { emails: [ME] }, emptyScanStats(), writer)
 		writer.flush()
 
 		// A fresh instance reads what the previous build wrote.
 		const reader = new BlameCache(db)
+
 		assert.equal(reader.size, writer.size)
 
 		const stats = emptyScanStats()
+
 		scanRepo(repo, { emails: [ME] }, stats, reader)
 		assert.equal(stats.filesBlamed, 0)
 		assert.ok(stats.filesCached > 0)
@@ -174,6 +188,7 @@ describe('blame cache', () => {
 	it('re-blames a file after its contents change', () => {
 		const db = openDb(':memory:')
 		const cache = new BlameCache(db)
+
 		scanRepo(repo, { emails: [ME] }, emptyScanStats(), cache)
 
 		writeFileSync(join(repo, 'mine.ts'), ['// Совсем новый комментарий.', 'const a = 1'].join('\n'))
@@ -182,6 +197,7 @@ describe('blame cache', () => {
 
 		const stats = emptyScanStats()
 		const found = scanRepo(repo, { emails: [ME] }, stats, cache)
+
 		assert.equal(stats.filesBlamed, 1)
 		assert.ok(found.map((c) => c.text).includes('Совсем новый комментарий.'))
 	})

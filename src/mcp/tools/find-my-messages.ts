@@ -1,14 +1,14 @@
+import { failure, text } from '@aimuzov/infra-mcp-kit'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { Register } from '#thinks/corpus/types'
-import { briefResult, errorResult } from '#thinks/mcp/brief'
 import { CORPUS_MISSING, type ToolContext } from '#thinks/mcp/context'
 import { searchTurns } from '#thinks/search/query'
 
 import { langSchema, registerSchema } from './shared.ts'
 
-export interface FindInput {
+export type FindInput = {
 	query: string
 	register?: Register
 	lang?: 'ru' | 'en'
@@ -41,7 +41,8 @@ export function registerFindMyMessages(server: McpServer, ctx: ToolContext) {
 		},
 		async (args: FindInput) => {
 			const corpus = ctx.corpus.get()
-			if (!corpus) return errorResult(CORPUS_MISSING)
+
+			if (!corpus) return failure(CORPUS_MISSING)
 
 			const rows = searchTurns(corpus.db, args.query, {
 				register: args.register,
@@ -52,16 +53,17 @@ export function registerFindMyMessages(server: McpServer, ctx: ToolContext) {
 				requireContext: args.matchIncoming,
 			})
 
-			if (!rows.length) return briefResult('Ничего не нашлось.')
+			if (!rows.length) return text('Ничего не нашлось.')
 
 			const rendered = rows.map((row, i) => {
 				const head = `[${i + 1}] ${row.register}${row.longform ? ', длинный' : ''}, ${row.year}`
 				const context = row.contextIn ? `\n  Мне написали: ${row.contextIn}` : ''
 				const parts = row.parts.map((p) => `    ${p}`).join('\n')
+
 				return `${head}${context}\n  Я написал:\n${parts}`
 			})
 
-			return briefResult(`Найдено ${rows.length}:\n\n${rendered.join('\n\n')}`)
+			return text(`Найдено ${rows.length}:\n\n${rendered.join('\n\n')}`)
 		},
 	)
 }

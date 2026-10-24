@@ -25,6 +25,7 @@ export function insertTurns(db: Db, turns: Turn[], holdoutPositions: Set<number>
 	const base = nextTurnId(db)
 
 	run(db, 'BEGIN')
+
 	try {
 		turns.forEach((turn, i) => {
 			insertTurn.run(
@@ -47,9 +48,11 @@ export function insertTurns(db: Db, turns: Turn[], holdoutPositions: Set<number>
 				turn.contextLag ?? null,
 			)
 		})
+
 		run(db, 'COMMIT')
 	} catch (err) {
 		run(db, 'ROLLBACK')
+
 		throw err
 	}
 }
@@ -61,17 +64,21 @@ export function insertTurns(db: Db, turns: Turn[], holdoutPositions: Set<number>
  */
 export function pickHoldout(turns: Turn[], size: number): Set<number> {
 	const eligible: number[] = []
+
 	turns.forEach((turn, i) => {
 		if (turn.contextIn && turn.contextIn.length >= 15 && turn.chars >= 15) {
 			eligible.push(i + 1)
 		}
 	})
+
 	if (eligible.length <= size) return new Set(eligible)
 
 	const step = Math.floor(eligible.length / size)
 	const picked = new Set<number>()
+
 	for (let i = 0; picked.size < size && i * step < eligible.length; i++) {
 		picked.add(eligible[i * step])
 	}
+
 	return picked
 }

@@ -152,6 +152,7 @@ function chop(word: string, endings: string[], rvStart: number): string | null {
 			return word.slice(0, word.length - e.length)
 		}
 	}
+
 	return null
 }
 
@@ -159,11 +160,14 @@ function chop(word: string, endings: string[], rvStart: number): string | null {
 function chopAfterAYa(word: string, endings: string[], rvStart: number): string | null {
 	for (const e of endings) {
 		const cut = word.length - e.length
+
 		if (cut - 1 >= rvStart && word.endsWith(e)) {
 			const before = word[cut - 1]
+
 			if (before === 'а' || before === 'я') return word.slice(0, cut)
 		}
 	}
+
 	return null
 }
 
@@ -172,6 +176,7 @@ function rvIndex(word: string): number {
 	for (let i = 0; i < word.length; i++) {
 		if (isVowel(word[i])) return i + 1
 	}
+
 	return word.length
 }
 
@@ -179,15 +184,20 @@ function rvIndex(word: string): number {
 function r2Index(word: string): number {
 	const afterPair = (from: number): number => {
 		let i = from
+
 		while (i < word.length && !isVowel(word[i])) i++
+
 		while (i < word.length && isVowel(word[i])) i++
+
 		return i
 	}
+
 	return afterPair(afterPair(0))
 }
 
 export function stemRussian(input: string): string {
 	let word = input
+
 	if (word.length <= 2) return word
 
 	const rv = rvIndex(word)
@@ -200,12 +210,14 @@ export function stemRussian(input: string): string {
 		word = chop(word, REFLEXIVE, rv) ?? word
 
 		const adjective = chop(word, ADJECTIVE, rv)
+
 		if (adjective !== null) {
 			step1 = chopAfterAYa(adjective, PARTICIPLE_1, rv) ?? chop(adjective, PARTICIPLE_2, rv) ?? adjective
 		} else {
 			step1 = chopAfterAYa(word, VERB_1, rv) ?? chop(word, VERB_2, rv) ?? chop(word, NOUN, rv)
 		}
 	}
+
 	if (step1 !== null) word = step1
 
 	// Step 2: a trailing "и".
@@ -224,6 +236,7 @@ export function stemRussian(input: string): string {
 		word = word.slice(0, -1)
 	} else {
 		const sup = chop(word, SUPERLATIVE, rv)
+
 		if (sup !== null) {
 			word = sup.endsWith('нн') ? sup.slice(0, -1) : sup
 		} else if (word.endsWith('ь')) {
@@ -245,6 +258,7 @@ export function stemRussian(input: string): string {
  */
 export function stemEnglish(input: string): string {
 	let word = input
+
 	if (word.length <= 3) return word
 
 	// Plurals and third person.
@@ -256,6 +270,7 @@ export function stemEnglish(input: string): string {
 
 	// Past tense and gerunds, but only when a vowel survives in the stem.
 	const hasVowel = (s: string) => /[aeiouy]/.test(s)
+
 	if (word.endsWith('eed')) {
 		if (measureOf(word.slice(0, -3)) > 0) word = word.slice(0, -1)
 	} else if (word.endsWith('ed') && hasVowel(word.slice(0, -2))) {
@@ -281,6 +296,7 @@ export function stemEnglish(input: string): string {
 	if (word.endsWith('e')) {
 		const stem = word.slice(0, -1)
 		const m = measureOf(stem)
+
 		if (m > 1 || (m === 1 && !endsCVC(stem))) word = stem
 	}
 
@@ -290,8 +306,10 @@ export function stemEnglish(input: string): string {
 /** Consonant-vowel-consonant ending, where the last is not w, x or y. */
 function endsCVC(stem: string): boolean {
 	if (stem.length < 3) return false
+
 	const [a, b, c] = stem.slice(-3)
 	const vowel = (ch: string) => 'aeiou'.includes(ch)
+
 	return !vowel(a) && vowel(b) && !vowel(c) && !'wxy'.includes(c)
 }
 
@@ -327,13 +345,16 @@ const ENGLISH_SUFFIXES: [string, string][] = [
 /** Restore the shape Porter's step 1b leaves behind. */
 function tidy(stem: string): string {
 	if (/(at|bl|iz)$/.test(stem)) return `${stem}e`
+
 	if (/([^aeiouylsz])\1$/.test(stem)) return stem.slice(0, -1)
+
 	return stem
 }
 
 /** Porter's m: the number of vowel-consonant sequences in a stem. */
 function measureOf(stem: string): number {
 	const shape = stem.replace(/[aeiou]+/g, 'V').replace(/[^V]+/g, 'C')
+
 	return (shape.match(/VC/g) ?? []).length
 }
 
@@ -344,13 +365,17 @@ const LATIN_RE = /^[a-z]+$/
 /** Split text into normalized, stemmed tokens. Used for indexing and querying. */
 export function tokenize(text: string): string[] {
 	const out: string[] = []
+
 	for (const match of text.toLowerCase().replace(/ё/g, 'е').matchAll(WORD_RE)) {
 		const word = match[0]
+
 		if (word.length < 2) continue
+
 		if (CYRILLIC_RE.test(word)) out.push(stemRussian(word))
 		else if (LATIN_RE.test(word)) out.push(stemEnglish(word))
 		else out.push(word)
 	}
+
 	return out
 }
 

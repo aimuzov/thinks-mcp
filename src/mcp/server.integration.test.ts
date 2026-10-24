@@ -3,8 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, it } from 'node:test'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
+import { connectInMemory, expectTools, textOf } from '@aimuzov/infra-mcp-kit/testing'
 
 import type { Config } from '#thinks/config'
 import { buildCorpus } from '#thinks/corpus/build'
@@ -16,6 +15,7 @@ import { createServer } from './server.ts'
 function seededConfig(): Config {
 	const dir = mkdtempSync(join(tmpdir(), 'thinks-mcp-'))
 	const dumpPath = join(dir, 'dump.json')
+
 	writeFileSync(dumpPath, JSON.stringify(makeDump()), 'utf8')
 
 	const cfg: Config = {
@@ -33,23 +33,15 @@ function seededConfig(): Config {
 		neverMarks: [],
 		voice: false,
 	}
+
 	buildCorpus(cfg)
+
 	return cfg
 }
 
-async function connect(cfg: Config) {
-	const server = createServer(cfg)
-	const client = new Client({ name: 'test', version: '0.0.0' })
-	const [clientT, serverT] = InMemoryTransport.createLinkedPair()
-	await Promise.all([server.connect(serverT), client.connect(clientT)])
-	return client
-}
+const connect = (cfg: Config) => connectInMemory(createServer(cfg))
 
-const textOf = (result: unknown): string =>
-	((result as { content: { type: string; text: string }[] }).content ?? [])
-		.filter((c) => c.type === 'text')
-		.map((c) => c.text)
-		.join('\n')
+const TOOLS = ['check_as_me', 'find_my_messages', 'rephrase_as_me', 'reply_as_me', 'write_as_me']
 
 // A resource may carry a blob instead of text; the profile is always text.
 const textOfResource = (c: { text?: string; blob?: string }): string => String(c.text ?? '')
@@ -63,14 +55,8 @@ beforeEach(() => {
 describe('MCP server (end to end)', () => {
 	it('registers every tool', async () => {
 		const client = await connect(cfg)
-		const { tools } = await client.listTools()
-		assert.deepEqual(tools.map((t) => t.name).sort(), [
-			'check_as_me',
-			'find_my_messages',
-			'rephrase_as_me',
-			'reply_as_me',
-			'write_as_me',
-		])
+
+		await expectTools(client, TOOLS)
 	})
 
 	it('write_as_me returns a brief with profile, examples and contract', async () => {
@@ -118,6 +104,7 @@ describe('MCP server (end to end)', () => {
 				structuredContent: { score: number; findings: unknown[] }
 			}
 		).structuredContent
+
 		assert.ok(report.score < 80)
 		assert.ok(report.findings.length > 0)
 		assert.ok(textOf(result).includes('Оценка:'))
@@ -131,18 +118,21 @@ describe('MCP server (end to end)', () => {
 				arguments: { query: 'сантехник' },
 			}),
 		)
+
 		assert.ok(text.includes('Сантехника вызывает'))
 	})
 
 	it('serves the style profile as a resource', async () => {
 		const client = await connect(cfg)
 		const { contents } = await client.readResource({ uri: 'style://profile' })
+
 		assert.ok(textOfResource(contents[0]).includes('Как я пишу'))
 	})
 
 	it('exposes the prompts', async () => {
 		const client = await connect(cfg)
 		const { prompts } = await client.listPrompts()
+
 		assert.deepEqual(prompts.map((p) => p.name).sort(), ['as-me', 'comment-as-me', 'reply-as-me', 'talk-like-me'])
 	})
 
@@ -164,6 +154,7 @@ describe('MCP server (end to end)', () => {
 			},
 			{ name: 'rephrase_as_me', arguments: { text: 'Я немного задержусь.' } },
 		]
+
 		for (const call of briefs) {
 			assert.ok(
 				textOf(await client.callTool(call)).includes('`...` вместо …, `--` вместо —, `=>` вместо →'),
@@ -179,6 +170,7 @@ describe('MCP server (end to end)', () => {
 			const report = result.structuredContent as {
 				findings: { issue: string; fragment?: string }[]
 			}
+
 			assert.deepEqual(
 				report.findings.filter((f) => f.issue === 'Знак, который я не набираю').map((f) => f.fragment),
 				['— может… позже.', 'час — может…'],
@@ -191,11 +183,13 @@ describe('MCP server (end to end)', () => {
 		// The zod enum and the Register type drifted apart once: the type gained
 		// code/jsdoc while the schema still rejected them at the protocol edge.
 		const client = await connect(cfg)
+
 		for (const register of ['dm', 'group', 'longform', 'code', 'jsdoc']) {
 			const result = await client.callTool({
 				name: 'find_my_messages',
 				arguments: { query: 'что угодно', register, limit: 2 },
 			})
+
 			assert.ok(!textOf(result).includes('Input validation error'), `register=${register} отвергнут схемой`)
 		}
 	})
@@ -208,17 +202,18 @@ describe('MCP server (end to end)', () => {
 			dbPath: join(cfg.dataDir, 'missing.db'),
 		})
 
-		const { tools } = await client.listTools()
-		assert.equal(tools.length, 5)
+		await expectTools(client, TOOLS)
 
 		const result = await client.callTool({
 			name: 'write_as_me',
 			arguments: { brief: 'что угодно' },
 		})
+
 		assert.equal((result as { isError?: boolean }).isError, true)
 		assert.ok(textOf(result).includes('thinks-mcp build'))
 
 		const { contents } = await client.readResource({ uri: 'style://profile' })
+
 		assert.ok(textOfResource(contents[0]).includes('thinks-mcp build'))
 	})
 
@@ -242,6 +237,7 @@ describe('MCP server (end to end)', () => {
 			name: 'find_my_messages',
 			arguments: { query: 'сантехник' },
 		})
+
 		assert.ok(!(after as { isError?: boolean }).isError)
 		assert.ok(textOf(after).includes('Сантехника вызывает'))
 	})

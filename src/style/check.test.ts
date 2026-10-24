@@ -72,18 +72,21 @@ const issues = (text: string) => check(text).findings.map((f) => f.issue)
 describe('checkText', () => {
 	it('passes a message written the way the profile describes', () => {
 		const report = check('Через час буду.\nМожет раньше.')
+
 		assert.deepEqual(report.findings, [])
 		assert.equal(report.score, 100)
 	})
 
 	it('flags a message far over the length ceiling', () => {
 		const report = check('А'.repeat(400))
+
 		assert.ok(issues('А'.repeat(400)).includes('Сообщение длиннее, чем я обычно пишу'))
 		assert.ok(report.score < 70)
 	})
 
 	it('flags bullet lists and markdown', () => {
 		const found = issues('Смотри:\n- первое\n- второе\nи **важное**')
+
 		assert.ok(found.includes('Список -- я так не пишу'))
 		assert.ok(found.includes('Markdown-разметка'))
 	})
@@ -94,12 +97,14 @@ describe('checkText', () => {
 			antiPatterns: [{ label: 'списки через дефис', hits: 5000, share: 3.1 }],
 		}
 		const found = checkText('Смотри:\n- первое\n- второе', listy).findings
+
 		assert.ok(!found.map((f) => f.issue).includes('Список -- я так не пишу'))
 	})
 
 	it('does not assert formatting habits that were never measured', () => {
 		const unmeasured: StyleProfile = { ...profile, antiPatterns: [] }
 		const found = checkText('- первое\n**второе**', unmeasured).findings
+
 		assert.ok(!found.map((f) => f.issue).includes('Список -- я так не пишу'))
 		assert.ok(!found.map((f) => f.issue).includes('Markdown-разметка'))
 	})
@@ -107,6 +112,7 @@ describe('checkText', () => {
 	it('flags clerical language with the offending fragment', () => {
 		const report = check('Однако решение принято.')
 		const clerical = report.findings.find((f) => f.issue === 'Канцелярит')
+
 		assert.equal(clerical?.fragment?.toLowerCase(), 'однако')
 	})
 
@@ -125,6 +131,7 @@ describe('checkText', () => {
 
 	it('never scores outside 0..100', () => {
 		const awful = check(['Однако'.repeat(200), '- список', '**жирный**', 'Ура! 👍😍🎉'].join('\n'))
+
 		assert.ok(awful.score >= 0)
 		assert.ok(awful.score <= 100)
 	})
@@ -147,6 +154,7 @@ const typed = (shares: Record<string, number>): StyleProfile => ({
 describe('checkText on typography', () => {
 	it('flags a mark the archive almost never carries', () => {
 		const found = checkText('Плов — пусть готовит.', typed({ 'длинное тире —': 1.1 }), 'dm').findings
+
 		assert.ok(found.map((f) => f.issue).includes('Знак не из моего набора'))
 		assert.equal(found[0].fragment, '—')
 		assert.ok(found[0].detail.includes('1.1%'))
@@ -154,11 +162,13 @@ describe('checkText on typography', () => {
 
 	it('lets a mark through for an author who types it', () => {
 		const found = checkText('Плов — пусть готовит.', typed({ 'длинное тире —': 4.3 }), 'dm').findings
+
 		assert.ok(!found.map((f) => f.issue).includes('Знак не из моего набора'))
 	})
 
 	it('says nothing about marks that were never measured', () => {
 		const found = checkText('Он сказал «нет» — и ушёл.', profile, 'dm').findings
+
 		assert.ok(!found.map((f) => f.issue).includes('Знак не из моего набора'))
 	})
 
@@ -168,6 +178,7 @@ describe('checkText on typography', () => {
 			neverMarks: [{ mark: '—', standIn: '--' }],
 		}
 		const found = checkText('Плов — пусть готовит.', declared, 'dm').findings
+
 		assert.deepEqual(found, [
 			{
 				issue: 'Знак, который я не набираю',
@@ -184,6 +195,7 @@ describe('checkText on typography', () => {
 			neverMarks: [{ mark: '—', standIn: '--' }],
 		}
 		const found = checkText('Плов — пусть… готовит.', both, 'dm').findings
+
 		assert.deepEqual(
 			found.map((f) => [f.issue, f.fragment]),
 			[
@@ -202,6 +214,7 @@ describe('checkText on typography', () => {
 			],
 		}
 		const found = checkText('Он сказал «нет» и ушёл.', quoted, 'dm').findings
+
 		assert.deepEqual(
 			found.map((f) => [f.fragment, f.detail]),
 			[
@@ -217,11 +230,13 @@ describe('checkText on typography', () => {
 			neverMarks: [{ mark: '→', standIn: '' }],
 		}
 		const [finding] = checkText('Туда → сюда.', bare, 'dm').findings
+
 		assert.equal(finding.detail, '→ не ставлю')
 	})
 
 	it('never holds the double hyphen against a text', () => {
 		const found = checkText('Пишу так -- и всё.', typed({ 'двойной дефис --': 0 }), 'dm').findings
+
 		assert.ok(!found.map((f) => f.issue).includes('Знак не из моего набора'))
 	})
 })
@@ -263,6 +278,7 @@ const checkCode = (text: string, register: 'code' | 'jsdoc' = 'code') => checkTe
 describe('checkText for comments', () => {
 	it('accepts a comment that follows the measured shape', () => {
 		const report = checkCode('// Так сделано потому что иначе ломается сборка.')
+
 		assert.deepEqual(report.findings, [])
 		assert.equal(report.score, 100)
 	})
@@ -271,6 +287,7 @@ describe('checkText for comments', () => {
 		// 84 characters of text: under the 87 ceiling once `// ` is stripped, over
 		// it if the marker were counted.
 		assert.deepEqual(checkCode(`// ${'а'.repeat(84)}`).findings, [])
+
 		assert.ok(
 			checkCode(`// ${'а'.repeat(100)}`)
 				.findings.map((f) => f.issue)
@@ -280,13 +297,16 @@ describe('checkText for comments', () => {
 
 	it('flags markers the corpus does not rely on', () => {
 		const found = checkCode('// FIXME: почини').findings
+
 		assert.ok(found.map((f) => f.issue).includes('Чужой маркер'))
 		assert.equal(found[0].detail, 'я использую только TODO, NOTE')
+
 		assert.ok(
 			checkCode('// XXX: почини')
 				.findings.map((f) => f.issue)
 				.includes('Чужой маркер'),
 		)
+
 		assert.deepEqual(checkCode('// TODO: доделать').findings, [])
 	})
 
@@ -295,16 +315,19 @@ describe('checkText for comments', () => {
 			...withCode,
 			code: { ...withCode.code!, markers: [] },
 		}
+
 		assert.deepEqual(checkText('// FIXME: почини', noMarkers, 'code').findings, [])
 	})
 
 	it('flags водянистые announcements', () => {
 		const found = checkCode('// Этот метод отвечает за обработку данных.')
+
 		assert.ok(found.findings.map((f) => f.issue).includes('Вода вместо факта'))
 	})
 
 	it('flags a type in braces inside jsdoc', () => {
 		const found = checkCode(['/**', ' * Что-то.', ' * @param {string} name - Имя.', ' */'].join('\n'), 'jsdoc')
+
 		assert.ok(found.findings.map((f) => f.issue).includes('Тип в фигурных скобках'))
 	})
 
@@ -322,7 +345,9 @@ describe('checkText for comments', () => {
 			' * Семь.',
 			' */',
 		].join('\n')
+
 		assert.deepEqual(checkCode(seven, 'jsdoc').findings, [])
+
 		assert.ok(
 			checkCode(seven, 'code')
 				.findings.map((f) => f.issue)
@@ -345,6 +370,7 @@ describe('checkText for comments', () => {
 			'code',
 			'function setRetryTimeout(retry, timeout) {',
 		)
+
 		assert.ok(restating.findings.map((f) => f.issue).includes('Пересказ кода'))
 
 		const explaining = checkText(
@@ -353,6 +379,7 @@ describe('checkText for comments', () => {
 			'code',
 			'const retryTimeout = DEFAULT_RETRY_TIMEOUT',
 		)
+
 		assert.ok(!explaining.findings.map((f) => f.issue).includes('Пересказ кода'))
 	})
 
@@ -371,6 +398,7 @@ describe('checkText for comments', () => {
 		// identifiers cannot be judged by word overlap, so the detector stays quiet
 		// rather than pretending.
 		assert.equal(codeOverlap('Кеш и ретрай', 'const cacheRetry = 1'), 0)
+
 		assert.ok(
 			!checkText(
 				'// Определяем платформу и возвращаем платформу.',
@@ -385,11 +413,13 @@ describe('checkText for comments', () => {
 
 	it('ignores the code argument for chat registers', () => {
 		const report = checkText('Буду.', profile, 'dm', 'const a = 1')
+
 		assert.deepEqual(report.findings, [])
 	})
 
 	it('says so when the code corpus has not been built', () => {
 		const report = checkText('// Что угодно.', profile, 'code')
+
 		assert.equal(report.verdict, 'Корпус кода не собран.')
 	})
 
@@ -414,6 +444,7 @@ describe('checkText for comments', () => {
 		const doc = ['/**', ' * Ставлю «ёлочки» — и тире.', ' */'].join('\n')
 		const found = checkText(doc, mixed, 'jsdoc').findings
 		const marks = found.filter((f) => f.issue === 'Знак не из моего набора')
+
 		assert.deepEqual(
 			marks.map((f) => f.fragment),
 			['«'],
@@ -440,6 +471,7 @@ describe('checkText for comments', () => {
 
 		const doc = ['директория — это Section1, файл — Section2,', 'глубже идут Section3…6. Тег → тесты.'].join('\n')
 		const report = checkText(doc, declared, 'jsdoc', 'const TAGGED_DEPTH = 2')
+
 		assert.deepEqual(
 			report.findings.map((f) => [f.fragment, f.detail]),
 			[
@@ -448,6 +480,7 @@ describe('checkText for comments', () => {
 				['Тег → тесты.', 'пиши `=>` вместо →'],
 			],
 		)
+
 		assert.equal(report.score, 55)
 	})
 })

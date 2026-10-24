@@ -1,6 +1,6 @@
 export type Counts = Map<string, number>
 
-export interface Marker {
+export type Marker = {
 	word: string
 	/** Times the owner used it. */
 	mine: number
@@ -25,15 +25,19 @@ const WORD_RE = /[\p{L}]+/gu
 export function countWords(text: string, into: Counts, capitalized?: Counts): void {
 	const normalized = text.replace(/ё/g, 'е').replace(/Ё/g, 'Е')
 	let first = true
+
 	for (const match of normalized.matchAll(WORD_RE)) {
 		const raw = match[0]
 		const w = raw.toLowerCase()
+
 		if (w.length >= 2) {
 			into.set(w, (into.get(w) ?? 0) + 1)
+
 			if (capitalized && !first && raw[0] !== w[0]) {
 				capitalized.set(w, (capitalized.get(w) ?? 0) + 1)
 			}
 		}
+
 		first = false
 	}
 }
@@ -68,13 +72,18 @@ export function markers(
 	const mineTotal = sum(mine)
 	const theirsTotal = sum(theirs)
 	const pooledTotal = mineTotal + theirsTotal
+
 	if (!mineTotal || !theirsTotal) return []
 
 	const out: Marker[] = []
+
 	for (const [word, y1] of mine) {
 		const y2 = theirs.get(word) ?? 0
+
 		if (y1 + y2 < minTotal) continue
+
 		if (capitalized && (capitalized.get(word) ?? 0) / y1 > 0.5) continue
+
 		if (exclude(word)) continue
 
 		// Prior weight for this word, scaled so the whole prior is worth one corpus.
@@ -100,6 +109,8 @@ export function markers(
 
 function sum(counts: Counts): number {
 	let total = 0
+
 	for (const n of counts.values()) total += n
+
 	return total
 }

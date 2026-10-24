@@ -1,7 +1,7 @@
 const OWNER = 'user1'
 const FRIEND = 'user2'
 
-interface FixtureMessage {
+type FixtureMessage = {
 	id: number
 	type: string
 	date_unixtime: string

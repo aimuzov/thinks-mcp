@@ -14,6 +14,7 @@ import { CORPUS_MISSING, type ToolContext } from './context.ts'
 export function registerResources(server: McpServer, ctx: ToolContext) {
 	const render = (register: Register) => {
 		const corpus = ctx.corpus.get()
+
 		return corpus ? renderProfile(corpus.profile, register, { full: true }) : CORPUS_MISSING
 	}
 
@@ -53,6 +54,7 @@ export function registerResources(server: McpServer, ctx: ToolContext) {
 		async (uri, variables) => {
 			const raw = String(variables.register)
 			const register = (REGISTERS as string[]).includes(raw) ? (raw as Register) : 'dm'
+
 			return {
 				contents: [{ uri: uri.href, mimeType: 'text/markdown', text: render(register) }],
 			}

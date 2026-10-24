@@ -2,7 +2,7 @@ import { hasSubstance, reject, type FilterStats } from './filter.ts'
 import type { Sanitizer } from './sanitize.ts'
 import type { ParsedChat, ParsedMessage, Turn } from './types.ts'
 
-export interface TurnOptions {
+export type TurnOptions = {
 	ownerId: string
 	burstWindowSeconds: number
 	longformMinChars: number
@@ -17,7 +17,7 @@ const CONTEXT_MAX_AGE_SECONDS = 6 * 3600
 /** Reply context is an excerpt, not a transcript. */
 const CONTEXT_MAX_CHARS = 400
 
-interface PendingContext {
+type PendingContext = {
 	text: string
 	ts: number
 	/** The author quoted this message explicitly, rather than us guessing. */
@@ -40,6 +40,7 @@ interface PendingContext {
 export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, stats: FilterStats): Turn[] {
 	const turns: Turn[] = []
 	const byId = new Map<number, ParsedMessage>()
+
 	for (const m of chat.messages) byId.set(m.id, m)
 
 	let parts: string[] = []
@@ -50,8 +51,10 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 
 	const flush = () => {
 		if (!parts.length) return
+
 		const text = parts.join('\n')
 		const chars = text.length
+
 		turns.push({
 			chatKey: chat.key,
 			register: chat.register,
@@ -65,6 +68,7 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 			contextExplicit: context?.explicit ?? false,
 			contextLag: context ? Math.max(0, startTs - context.ts) : null,
 		})
+
 		parts = []
 		context = null
 	}
@@ -72,11 +76,15 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 	/** The message this one quotes, if it is someone else's and has text. */
 	const quoted = (m: ParsedMessage): PendingContext | null => {
 		if (!m.replyToId) return null
+
 		const target = byId.get(m.replyToId)
+
 		if (!target || target.fromId === opts.ownerId) return null
 
 		const text = san.clean(target.entities)
+
 		if (!text || !hasSubstance(text)) return null
+
 		return {
 			text: text.slice(0, CONTEXT_MAX_CHARS),
 			ts: target.ts,
@@ -90,6 +98,7 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 			// Remember what was just said to us; it becomes the context of whatever
 			// the owner says next, provided they answer within a few hours.
 			const incoming = san.clean(m.entities)
+
 			if (incoming && hasSubstance(incoming)) {
 				pending = {
 					text: incoming.slice(0, CONTEXT_MAX_CHARS),
@@ -97,11 +106,13 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 					explicit: false,
 				}
 			}
+
 			stats['not-owner']++
 			continue
 		}
 
 		const reason = reject(m, opts.ownerId)
+
 		if (reason) {
 			// A forward or a photo in the middle of a burst interrupts the text but
 			// not the thought — skip it without breaking the run.
@@ -111,11 +122,13 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 		}
 
 		const cleaned = san.clean(m.entities)
+
 		if (!cleaned || !hasSubstance(cleaned)) {
 			stats.empty++
 			lastTs = m.ts
 			continue
 		}
+
 		stats.kept++
 
 		const continues = parts.length > 0 && parts.length < MAX_PARTS && m.ts - lastTs <= opts.burstWindowSeconds
@@ -125,6 +138,7 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 			startTs = m.ts
 
 			const fresh = pending && m.ts - pending.ts <= CONTEXT_MAX_AGE_SECONDS ? pending : null
+
 			// An explicit quote beats the guess even when the guess is more recent.
 			context = quoted(m) ?? fresh
 			// One incoming message is the context of one turn. Without this reset a
@@ -137,5 +151,6 @@ export function buildTurns(chat: ParsedChat, san: Sanitizer, opts: TurnOptions, 
 	}
 
 	flush()
+
 	return turns
 }

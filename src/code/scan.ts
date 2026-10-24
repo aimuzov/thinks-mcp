@@ -4,7 +4,7 @@ import { basename, join } from 'node:path'
 
 import { blockText, extractBlocks, syntaxFor, type CommentBlock } from './comments.ts'
 
-export interface CodeComment {
+export type CodeComment = {
 	/** Repository directory name — never the full path. */
 	repo: string
 	lines: string[]
@@ -16,14 +16,14 @@ export interface CodeComment {
 	code: string | null
 }
 
-export interface ScanOptions {
+export type ScanOptions = {
 	/** Author emails that count as the owner. */
 	emails: string[]
 	/** Skip files larger than this, in bytes. */
 	maxFileBytes?: number
 }
 
-export interface ScanStats {
+export type ScanStats = {
 	repos: number
 	filesConsidered: number
 	filesBlamed: number
@@ -58,17 +58,21 @@ function candidateFiles(repo: string, emails: string[]): string[] {
 	const tracked = new Set(git(repo, ['ls-files']).split('\n').filter(Boolean))
 
 	const touched = new Set<string>()
+
 	for (const email of emails) {
 		const out = git(repo, ['log', `--author=${email}`, '--pretty=format:', '--name-only', '--no-merges'])
+
 		for (const line of out.split('\n')) {
 			const path = line.trim()
+
 			if (path && tracked.has(path) && syntaxFor(path)) touched.add(path)
 		}
 	}
+
 	return [...touched]
 }
 
-interface BlamedLine {
+type BlamedLine = {
 	line: number
 	email: string
 	year: number
@@ -100,6 +104,7 @@ function blame(repo: string, path: string): Map<number, BlamedLine> {
 			byLine.set(lineNo, { line: lineNo, email, year })
 		}
 	}
+
 	return byLine
 }
 
@@ -115,8 +120,11 @@ function ownedBy(
 
 	for (let i = 0; i < block.lines.length; i++) {
 		const info = blamed.get(block.startLine + i)
+
 		if (!info) continue
+
 		total++
+
 		if (emails.has(info.email)) {
 			mine++
 			year = Math.max(year, info.year)
@@ -144,23 +152,28 @@ function readSource(repo: string, path: string): string | null {
  */
 function blobHashes(repo: string): Map<string, string> {
 	const out = new Map<string, string>()
+
 	for (const line of git(repo, ['ls-files', '-s']).split('\n')) {
 		// "100644 <sha> 0\t<path>"
 		const [meta, path] = line.split('\t')
+
 		if (!path) continue
+
 		const sha = meta.split(' ')[1]
+
 		if (sha) out.set(path, sha)
 	}
+
 	return out
 }
 
 /** Comments of one file, as cached between builds. */
-export interface CachedFile {
+export type CachedFile = {
 	blob: string
 	comments: CodeComment[]
 }
 
-export interface ScanCache {
+export type ScanCache = {
 	get(repo: string, path: string): CachedFile | undefined
 	set(repo: string, path: string, entry: CachedFile): void
 }
@@ -176,11 +189,14 @@ export function scanRepo(repo: string, opts: ScanOptions, stats: ScanStats, cach
 	for (const path of candidateFiles(repo, opts.emails)) {
 		stats.filesConsidered++
 		const syntax = syntaxFor(path)
+
 		if (!syntax) continue
 
 		const blob = blobs?.get(path)
+
 		if (cache && blob) {
 			const hit = cache.get(name, path)
+
 			if (hit?.blob === blob) {
 				stats.filesCached++
 				stats.kept += hit.comments.length
@@ -190,11 +206,14 @@ export function scanRepo(repo: string, opts: ScanOptions, stats: ScanStats, cach
 		}
 
 		const source = readSource(repo, path)
+
 		if (source == null || source.length > maxBytes) continue
 
 		const blocks = extractBlocks(source, syntax)
+
 		if (!blocks.length) {
 			if (cache && blob) cache.set(name, path, { blob, comments: [] })
+
 			continue
 		}
 
@@ -204,18 +223,23 @@ export function scanRepo(repo: string, opts: ScanOptions, stats: ScanStats, cach
 
 		for (const block of blocks) {
 			stats.blocks++
+
 			// Section rules (`// ----------`) and commented-out code are not prose;
 			// as examples they teach a model to produce decoration.
 			if (!hasProse(block.lines)) {
 				stats.skippedNoise++
 				continue
 			}
+
 			const { owned, year } = ownedBy(block, blamed, emails)
+
 			if (!owned) {
 				stats.skippedOther++
 				continue
 			}
+
 			stats.kept++
+
 			fresh.push({
 				repo: name,
 				lines: block.lines,
@@ -228,6 +252,7 @@ export function scanRepo(repo: string, opts: ScanOptions, stats: ScanStats, cach
 		}
 
 		out.push(...fresh)
+
 		if (cache && blob) cache.set(name, path, { blob, comments: fresh })
 	}
 
@@ -252,10 +277,12 @@ function hasProse(lines: string[]): boolean {
 
 	const text = lines.join(' ')
 	const letters = (text.match(/\p{L}/gu) ?? []).length
+
 	if (letters < 4) return false
 
 	// Commented-out code: mostly identifiers, braces and semicolons.
 	const syntax = (text.match(/[{}();=<>[\]]/g) ?? []).length
+
 	return syntax / text.length < 0.08
 }
 

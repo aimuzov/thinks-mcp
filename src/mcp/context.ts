@@ -5,7 +5,7 @@ import { openDb, type Db } from '#thinks/store/db'
 import { loadProfile, type StyleProfile } from '#thinks/style/profile'
 
 /** Everything a tool needs once the corpus exists. */
-export interface Corpus {
+export type Corpus = {
 	db: Db
 	profile: StyleProfile
 }
@@ -36,12 +36,15 @@ export class CorpusRef {
 
 	get(): Corpus | null {
 		if (this.corpus) return this.corpus
+
 		if (!existsSync(this.cfg.dbPath)) return null
 
 		const db = openDb(this.cfg.dbPath)
 		const profile = loadProfile(db)
+
 		if (!profile) {
 			db.close()
+
 			return null
 		}
 
@@ -49,6 +52,7 @@ export class CorpusRef {
 			db,
 			profile: { ...profile, neverMarks: this.cfg.neverMarks },
 		}
+
 		return this.corpus
 	}
 
@@ -59,7 +63,7 @@ export class CorpusRef {
 }
 
 /** Shared dependencies passed to every tool's register function. */
-export interface ToolContext {
+export type ToolContext = {
 	cfg: Config
 	corpus: CorpusRef
 }

@@ -22,6 +22,7 @@ export function registerPrompts(server: McpServer, ctx: ToolContext) {
 		},
 		() => {
 			const corpus = ctx.corpus.get()
+
 			return {
 				messages: [
 					{
@@ -103,6 +104,7 @@ export function registerPrompts(server: McpServer, ctx: ToolContext) {
 		},
 		({ code, kind }) => {
 			const register = kind === 'jsdoc' ? 'jsdoc' : 'code'
+
 			return {
 				messages: [
 					{

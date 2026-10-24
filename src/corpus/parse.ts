@@ -4,7 +4,7 @@ import { JsonScanner } from './scanner.ts'
 import type { ParsedChat, ParsedMessage, TextEntity } from './types.ts'
 
 /** Raw shapes we care about in a Telegram JSON export. */
-interface RawMessage {
+type RawMessage = {
 	id?: number
 	type?: string
 	date_unixtime?: string
@@ -18,14 +18,14 @@ interface RawMessage {
 	reply_to_message_id?: number
 }
 
-interface RawChat {
+type RawChat = {
 	id?: number
 	name?: string | null
 	type?: string
 	messages?: RawMessage[]
 }
 
-interface RawDump {
+type RawDump = {
 	chats?: { list?: RawChat[] }
 	left_chats?: { list?: RawChat[] }
 }
@@ -53,17 +53,20 @@ export function readDump(dumpPath: string): Dump {
  */
 export function* streamChats(dumpPath: string, chunkSize?: number): Generator<RawChat> {
 	const s = new JsonScanner(dumpPath, chunkSize)
+
 	try {
 		for (const section of s.entries()) {
 			if (section !== 'chats' && section !== 'left_chats') {
 				s.skip()
 				continue
 			}
+
 			for (const key of s.entries()) {
 				if (key !== 'list') {
 					s.skip()
 					continue
 				}
+
 				for (const _ of s.items()) yield readChat(s)
 			}
 		}
@@ -74,17 +77,20 @@ export function* streamChats(dumpPath: string, chunkSize?: number): Generator<Ra
 
 function readChat(s: JsonScanner): RawChat {
 	const chat: RawChat = {}
+
 	for (const key of s.entries()) {
 		if (key === 'id') chat.id = s.value() as number
 		else if (key === 'name') chat.name = s.value() as string | null
 		else if (key === 'type') chat.type = s.value() as string
 		else if (key === 'messages') {
 			chat.messages = []
+
 			for (const _ of s.items()) {
 				chat.messages.push(trimMessage(s.value() as RawMessage))
 			}
 		} else s.skip()
 	}
+
 	return chat
 }
 
@@ -117,30 +123,37 @@ function trimMessage(m: RawMessage): RawMessage {
  */
 export function resolveOwnerId(chats: Dump): string {
 	const counts = new Map<string, number>()
+
 	for (const chat of chats) {
 		if (chat.type === 'saved_messages') {
 			const own = chat.messages?.find((m) => m.from_id)
+
 			if (own?.from_id) return own.from_id
 		}
+
 		for (const m of chat.messages ?? []) {
 			if (!m.from_id) continue
+
 			counts.set(m.from_id, (counts.get(m.from_id) ?? 0) + 1)
 		}
 	}
 
 	let best = ''
 	let bestCount = 0
+
 	for (const [id, count] of counts) {
 		if (count > bestCount) {
 			best = id
 			bestCount = count
 		}
 	}
+
 	if (!best) {
 		throw new Error(
 			'Не удалось определить владельца выгрузки: ни у одного сообщения нет ' + 'from_id. Задай THINKS_OWNER_ID.',
 		)
 	}
+
 	return best
 }
 
@@ -150,15 +163,19 @@ export function resolveOwnerId(chats: Dump): string {
  */
 export function pseudonym(prefix: string, seed: string): string {
 	const h = createHash('sha256').update(seed).digest('hex').slice(0, 6)
+
 	return `${prefix}-${h}`
 }
 
 function entitiesOf(raw: RawMessage): TextEntity[] {
 	const out: TextEntity[] = []
+
 	for (const e of raw.text_entities ?? []) {
 		const text = e?.text ?? ''
+
 		if (text) out.push({ type: e?.type ?? 'plain', text })
 	}
+
 	return out
 }
 
@@ -176,6 +193,7 @@ export function* iterateChats(chats: Dump, stopList: string[] = []): Generator<P
 
 	for (const chat of chats) {
 		const name = chat.name ?? ''
+
 		if (blocked.has(name.toLowerCase())) continue
 
 		const type = chat.type ?? 'unknown'
@@ -183,7 +201,9 @@ export function* iterateChats(chats: Dump, stopList: string[] = []): Generator<P
 
 		for (const raw of chat.messages ?? []) {
 			if (raw.type !== 'message') continue
+
 			const entities = entitiesOf(raw)
+
 			messages.push({
 				id: raw.id ?? 0,
 				ts: Number.parseInt(raw.date_unixtime ?? '0', 10) || 0,

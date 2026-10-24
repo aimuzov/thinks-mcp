@@ -10,6 +10,7 @@ function counts(pairs: [string, number][]): Counts {
 describe('countWords', () => {
 	it('lowercases, folds ё and skips single letters', () => {
 		const c: Counts = new Map()
+
 		countWords('Ещё раз ещё, я в Ага!', c)
 		assert.equal(c.get('еще'), 2)
 		assert.equal(c.get('ага'), 1)
@@ -46,6 +47,7 @@ describe('markers', () => {
 			counts([['частое', 100]]),
 			{ minTotal: 40 },
 		)
+
 		assert.ok(!ranked.map((m) => m.word).includes('редкое'))
 	})
 

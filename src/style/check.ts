@@ -1,10 +1,10 @@
 import { isCodeRegister, type Register } from '#thinks/corpus/types'
 
 import { listShare, markdownShare, RARE_SHARE, word } from './antipatterns.ts'
-import { splitMarkers } from './codeMetrics.ts'
+import { splitMarkers } from './code-metrics.ts'
 import { foreignMarks, metricsFor, type StyleProfile } from './profile.ts'
 
-export interface Finding {
+export type Finding = {
 	/** What tripped, in the owner's terms. */
 	issue: string
 	/** The offending fragment, when there is one. */
@@ -14,7 +14,7 @@ export interface Finding {
 	penalty: number
 }
 
-export interface CheckReport {
+export type CheckReport = {
 	register: Register
 	score: number
 	verdict: string
@@ -56,7 +56,9 @@ function typographyFindings(text: string, profile: StyleProfile, register: Regis
 	// a bare `—` does not tell which of five dashes to fix.
 	for (const { mark, standIn } of profile.neverMarks ?? []) {
 		const at = text.indexOf(mark)
+
 		if (at === -1) continue
+
 		out.push({
 			issue: 'Знак, который я не набираю',
 			fragment: truncate(around(text, at, mark.length)),
@@ -67,7 +69,9 @@ function typographyFindings(text: string, profile: StyleProfile, register: Regis
 
 	for (const probe of foreignMarks(profile, register)) {
 		const match = text.match(probe.test)
+
 		if (!match) continue
+
 		out.push({
 			issue: 'Знак не из моего набора',
 			fragment: match[0],
@@ -75,6 +79,7 @@ function typographyFindings(text: string, profile: StyleProfile, register: Regis
 			penalty: 10,
 		})
 	}
+
 	return out
 }
 
@@ -82,6 +87,7 @@ function typographyFindings(text: string, profile: StyleProfile, register: Regis
 function around(text: string, at: number, length: number): string {
 	const before = text.slice(0, at).match(/(?:\S+\s+)?\S*$/u)?.[0] ?? ''
 	const after = text.slice(at + length).match(/^\S*(?:\s+\S+)?/u)?.[0] ?? ''
+
 	return `${before}${text.slice(at, at + length)}${after}`.replace(/\s+/gu, ' ')
 }
 
@@ -128,6 +134,7 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 			})
 		}
 	}
+
 	if (whole.length > m.turnLength.p90) {
 		findings.push({
 			issue: 'Ответ целиком длиннее обычного',
@@ -148,6 +155,7 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 	// Punctuation habits.
 	const exclamations = messages.filter((s) => s.includes('!')).length
 	const expectedExcl = m.punctuation.hasExclamation * messages.length
+
 	if (exclamations > Math.max(1, expectedExcl * 3)) {
 		findings.push({
 			issue: 'Слишком много восклицательных знаков',
@@ -157,6 +165,7 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 	}
 
 	const noPeriod = messages.filter((s) => /[\p{L}\p{N}]$/u.test(s)).length
+
 	if (m.punctuation.endsPeriod > 0.5 && noPeriod / messages.length > 0.6) {
 		findings.push({
 			issue: 'Нет точек в конце',
@@ -167,8 +176,10 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 
 	const lowercaseStart = messages.filter((s) => {
 		const first = [...s][0] ?? ''
+
 		return /\p{Ll}/u.test(first)
 	}).length
+
 	if (m.punctuation.startsCapital > 0.8 && lowercaseStart / messages.length > 0.4) {
 		findings.push({
 			issue: 'Сообщения начинаются со строчной буквы',
@@ -180,6 +191,7 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 	// Emoji outside the palette.
 	const palette = new Set(m.emoji.slice(0, 8).map((e) => e.char))
 	const foreign = new Set([...whole.matchAll(EMOJI_RE)].map((x) => x[0]).filter((ch) => !palette.has(ch)))
+
 	if (foreign.size) {
 		findings.push({
 			issue: 'Эмодзи не из моей палитры',
@@ -192,6 +204,7 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 	// Formatting is held against the text only when the archive was measured
 	// and really does without it.
 	const lists = listShare(profile.antiPatterns)
+
 	if (lists !== undefined && lists < RARE_SHARE && /^\s*([-–—•*]|\d[.)])\s+\S/m.test(whole)) {
 		findings.push({
 			issue: 'Список -- я так не пишу',
@@ -199,7 +212,9 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 			penalty: 15,
 		})
 	}
+
 	const markdown = markdownShare(profile.antiPatterns)
+
 	if (markdown !== undefined && markdown < RARE_SHARE && /\*\*|__/.test(whole)) {
 		findings.push({
 			issue: 'Markdown-разметка',
@@ -210,6 +225,7 @@ export function checkText(text: string, profile: StyleProfile, register: Registe
 
 	for (const probe of CLERICAL) {
 		const match = whole.match(probe.test)
+
 		if (match) {
 			findings.push({
 				issue: 'Канцелярит',
@@ -260,10 +276,13 @@ export function codeOverlap(comment: string, code: string): number {
 
 	const own = words(comment)
 	const theirs = words(code)
+
 	if (!own.size || !theirs.size) return 0
 
 	let shared = 0
+
 	for (const w of own) if (theirs.has(w)) shared++
+
 	return shared / own.size
 }
 
@@ -303,6 +322,7 @@ function checkComment(text: string, profile: StyleProfile, register: 'code' | 'j
 	// only one that needs the code itself to check.
 	if (code) {
 		const overlap = codeOverlap(whole, code)
+
 		if (overlap > RESTATEMENT_THRESHOLD) {
 			findings.push({
 				issue: 'Пересказ кода',
@@ -336,6 +356,7 @@ function checkComment(text: string, profile: StyleProfile, register: 'code' | 'j
 
 	// No markers in the corpus means nothing to hold the text against.
 	const { own, foreign } = splitMarkers(codeStats)
+
 	for (const marker of own.length ? foreign : []) {
 		if (new RegExp(`\\b${marker}\\b`).test(whole)) {
 			findings.push({
@@ -349,6 +370,7 @@ function checkComment(text: string, profile: StyleProfile, register: 'code' | 'j
 
 	for (const probe of CLERICAL) {
 		const match = whole.match(probe.test)
+
 		if (match) {
 			findings.push({
 				issue: 'Канцелярит',
@@ -361,6 +383,7 @@ function checkComment(text: string, profile: StyleProfile, register: 'code' | 'j
 
 	for (const probe of CODE_WATER) {
 		const match = whole.match(probe.test)
+
 		if (match) {
 			findings.push({
 				issue: 'Вода вместо факта',
@@ -372,6 +395,7 @@ function checkComment(text: string, profile: StyleProfile, register: 'code' | 'j
 	}
 
 	const foreignEmoji = [...whole.matchAll(EMOJI_RE)]
+
 	if (foreignEmoji.length) {
 		findings.push({
 			issue: 'Эмодзи в комментарии',
@@ -426,8 +450,11 @@ const CODE_WATER: { test: RegExp; why: string }[] = [
 
 function verdictFor(score: number): string {
 	if (score >= 85) return 'Похоже на меня.'
+
 	if (score >= 65) return 'В целом похоже, но есть что поправить.'
+
 	if (score >= 40) return 'Узнаётся с трудом -- перепиши по замечаниям.'
+
 	return 'Это не мой голос.'
 }
 
@@ -440,16 +467,21 @@ export function renderCheck(report: CheckReport): string {
 
 	if (!report.findings.length) {
 		lines.push('', 'Замечаний нет.')
+
 		return lines.join('\n')
 	}
 
 	lines.push('', 'Что выдаёт не меня:')
+
 	for (const f of report.findings) {
 		// Straight quotes: a fragment is often the guillemet itself, and wrapping
 		// it in more of them makes the finding unreadable.
 		const fragment = f.fragment ? ` -- "${f.fragment}"` : ''
+
 		lines.push(`- ${f.issue}${fragment}: ${f.detail}`)
 	}
+
 	lines.push('', 'Перепиши текст с учётом этих замечаний и проверь ещё раз.')
+
 	return lines.join('\n')
 }

@@ -1,4 +1,4 @@
-import { splitMarkers, type CodeMetrics } from './codeMetrics.ts'
+import { splitMarkers, type CodeMetrics } from './code-metrics.ts'
 
 const pct = (share: number) => `${Math.round(share * 1000) / 10}%`
 
@@ -29,48 +29,61 @@ export function renderCodeProfile(
 	)
 
 	lines.push('## Размер')
+
 	lines.push(
 		`- Строка комментария: медиана ${sizes.lineWidth.median} символов, ` + `90% короче ${sizes.lineWidth.p90}.`,
 	)
+
 	lines.push(
 		`- Однострочных блоков -- ${pct(sizes.blockLines.oneLiners)}: если сказать ` +
 			'нечего сверх одной фразы, одной строкой и ограничиваюсь.',
 	)
+
 	lines.push(
 		`- Когда объясняю развёрнуто -- медиана ${sizes.blockLines.medianMulti} строк, ` +
 			`90% блоков короче ${sizes.blockLines.p90}.`,
 	)
+
 	lines.push('')
 
 	lines.push('## Язык')
+
 	lines.push(
 		`- По-русски написано ${pct(sizes.russian)} комментариев этого жанра. ` +
 			'Язык выбирается по файлу, а не по привычке: как вокруг -- так и пишу.',
 	)
+
 	lines.push('')
 
 	if (code.connectives.length) {
 		lines.push('## Как я объясняю')
+
 		lines.push(
 			'- Комментарий отвечает на "почему", и это видно по связкам причинности. ' + 'Частота в моих блоках:',
 		)
+
 		for (const c of code.connectives.slice(0, opts.full ? 12 : 6)) {
 			lines.push(`  - "${c.phrase}" -- ${c.count} (${pct(c.share)})`)
 		}
+
 		lines.push('')
 	}
 
 	const { own, foreign } = splitMarkers(code)
+
 	if (own.length) {
 		const used = code.markers.filter((m) => own.includes(m.name)).map((m) => `${m.name} (${m.count})`)
 		const stray = code.markers.filter((m) => !own.includes(m.name)).map((m) => `${m.name} -- ${m.count}`)
+
 		lines.push('## Маркеры')
 		lines.push(`- Пользуюсь только этими: ${used.join(', ')}.`)
+
 		lines.push(
 			stray.length
 				? `- Остальные почти не встречаются: ${stray.join(', ')}.`
 				: `- ${foreign.join(', ')} не использую вовсе.`,
 		)
+
 		lines.push('')
 	}
 
@@ -78,10 +91,12 @@ export function renderCodeProfile(
 		// Names are pseudonyms by the time they get here; only the spread is
 		// informative — it says whether the corpus rests on one project or many.
 		lines.push('## Откуда корпус')
+
 		lines.push(
 			`- ${code.repos.length} репозиториев, крупнейший даёт ` +
 				`${Math.round((code.repos[0].blocks / code.blocks) * 100)}% блоков.`,
 		)
+
 		lines.push('')
 	}
 
@@ -108,6 +123,7 @@ export function codeConstraints(code: CodeMetrics, register: 'code' | 'jsdoc'): 
 	} else {
 		out.push('Полное предложение -- с точкой. Короткий ярлык над блоком -- без точки.')
 		const { own } = splitMarkers(code)
+
 		if (own.length) {
 			out.push(`Маркеры только эти: ${own.join(', ')}. Формат \`// МАРКЕР: Текст.\``)
 		}

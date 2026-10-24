@@ -1,6 +1,6 @@
 import type { Turn } from '#thinks/corpus/types'
 
-export interface LengthStats {
+export type LengthStats = {
 	count: number
 	mean: number
 	p25: number
@@ -10,7 +10,7 @@ export interface LengthStats {
 	max: number
 }
 
-export interface PunctuationStats {
+export type PunctuationStats = {
 	/** Share of messages starting with a capital letter. */
 	startsCapital: number
 	/** Share of messages ending in each of these. */
@@ -26,7 +26,7 @@ export interface PunctuationStats {
 	hasDash: number
 }
 
-export interface BurstStats {
+export type BurstStats = {
 	/** Share of turns made of exactly 1, 2, 3, 4+ messages. */
 	single: number
 	double: number
@@ -37,7 +37,7 @@ export interface BurstStats {
 	meanParts: number
 }
 
-export interface RegisterMetrics {
+export type RegisterMetrics = {
 	turns: number
 	messages: number
 	messageLength: LengthStats
@@ -53,13 +53,16 @@ const EMOJI_RE = /[\p{Extended_Pictographic}ツ]/gu
 
 function percentile(sorted: number[], p: number): number {
 	if (!sorted.length) return 0
+
 	const i = Math.min(sorted.length - 1, Math.floor(sorted.length * p))
+
 	return sorted[i]
 }
 
 function lengths(values: number[]): LengthStats {
 	const sorted = [...values].sort((a, b) => a - b)
 	const sum = sorted.reduce((a, b) => a + b, 0)
+
 	return {
 		count: sorted.length,
 		mean: sorted.length ? round(sum / sorted.length, 1) : 0,
@@ -73,6 +76,7 @@ function lengths(values: number[]): LengthStats {
 
 const round = (n: number, digits = 3) => {
 	const f = 10 ** digits
+
 	return Math.round(n * f) / f
 }
 
@@ -99,14 +103,17 @@ export function measure(turns: Turn[]): RegisterMetrics {
 
 	for (const m of messages) {
 		const first = [...m][0] ?? ''
+
 		if (/\p{L}/u.test(first)) {
 			alphaStart++
+
 			if (first === first.toUpperCase() && first !== first.toLowerCase()) {
 				startsCapital++
 			}
 		}
 
 		const last = m.at(-1) ?? ''
+
 		if (last === '.') ends.period++
 		else if (last === '?') ends.question++
 		else if (last === '!') ends.exclamation++
@@ -114,12 +121,16 @@ export function measure(turns: Turn[]): RegisterMetrics {
 		else ends.nothing++
 
 		if (m.includes('?')) hasQuestion++
+
 		if (m.includes('!')) hasExclamation++
+
 		if (m.includes('...') || m.includes('…')) hasEllipsis++
+
 		if (/\s—\s/.test(m)) hasDash++
 
 		for (const match of m.matchAll(EMOJI_RE)) {
 			const ch = match[0]
+
 			emoji.set(ch, (emoji.get(ch) ?? 0) + 1)
 		}
 	}
