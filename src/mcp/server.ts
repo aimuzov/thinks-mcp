@@ -1,5 +1,4 @@
-import { readVersion } from '@aimuzov/infra-mcp-kit'
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { McpServer, readVersion } from '@aimuzov/infra-mcp-kit'
 
 import type { Config } from '#thinks/config'
 

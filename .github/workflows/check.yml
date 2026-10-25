@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: aimuzov/infra-mcp-kit/check@v2
+      - uses: aimuzov/infra-mcp-kit/check@v3
         # Образ собирается и на сервере, но лучше, чтобы он сломался здесь.
         with:
           docker: deploy/Dockerfile

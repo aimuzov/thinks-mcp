@@ -1,5 +1,4 @@
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { ResourceTemplate, type McpServer } from '@aimuzov/infra-mcp-kit'
 
 import type { Register } from '#thinks/corpus/types'
 import { REGISTERS, renderProfile } from '#thinks/style/profile'
