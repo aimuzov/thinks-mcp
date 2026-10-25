@@ -51,11 +51,13 @@ export function childRunner(heapMb: number): BuildRunner {
 			let settled = false
 			const done = (error: string | null) => {
 				if (settled) return
+
 				settled = true
 				resolve(error)
 			}
 
 			child.stderr.setEncoding('utf8')
+
 			child.stderr.on('data', (chunk: string) => {
 				stderr = (stderr + chunk).slice(-STDERR_TAIL)
 			})
