@@ -1,6 +1,22 @@
-# thinks-mcp
+<p align="center">
+	<img src="https://img.shields.io/badge/English-8b5cf6?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCAzMCI+PGNsaXBQYXRoIGlkPSJ0Ij48cGF0aCBkPSJNMzAsMTVoMzB2MTV6djE1aC0zMHpoLTMwdi0xNXp2LTE1aDMweiIvPjwvY2xpcFBhdGg+PHBhdGggZD0iTTAsMHYzMGg2MHYtMzB6IiBmaWxsPSIjMDEyMTY5Ii8+PHBhdGggZD0iTTAsMCA2MCwzME02MCwwIDAsMzAiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSI2Ii8+PHBhdGggZD0iTTAsMCA2MCwzME02MCwwIDAsMzAiIGNsaXAtcGF0aD0idXJsKCN0KSIgc3Ryb2tlPSIjQzgxMDJFIiBzdHJva2Utd2lkdGg9IjQiLz48cGF0aCBkPSJNMzAsMHYzME0wLDE1aDYwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMTAiLz48cGF0aCBkPSJNMzAsMHYzME0wLDE1aDYwIiBzdHJva2U9IiNDODEwMkUiIHN0cm9rZS13aWR0aD0iNiIvPjwvc3ZnPg==" alt="English">
+	<a href="README.ru.md"><img src="https://img.shields.io/badge/%D0%A0%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9-555?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5IDYiPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik0wIDBoOXYzSDB6Ii8+PHBhdGggZmlsbD0iIzAwMzlhNiIgZD0iTTAgMmg5djJIMHoiLz48cGF0aCBmaWxsPSIjZDUyYjFlIiBkPSJNMCA0aDl2MkgweiIvPjwvc3ZnPg==" alt="Русский"></a>
+</p>
 
-[Русская версия](README.ru.md)
+<p align="center">
+	<img src=".github/assets/banner.en.jpg" alt="thinks-mcp: writes and replies in your voice" width="100%">
+</p>
+
+<p align="center">
+	<a href="https://github.com/aimuzov/thinks-mcp/actions/workflows/check.yml"><img src="https://img.shields.io/github/actions/workflow/status/aimuzov/thinks-mcp/check.yml?branch=main&label=check" alt="Check"></a>
+	<a href="https://github.com/aimuzov/thinks-mcp/releases"><img src="https://img.shields.io/github/v/release/aimuzov/thinks-mcp?sort=semver&label=version" alt="Version"></a>
+	<a href="package.json"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Faimuzov%2Fthinks-mcp%2Fmain%2Fpackage.json&query=%24.engines.node&label=node&logo=nodedotjs&logoColor=white&color=5fa04e" alt="Node"></a>
+	<a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-server-8b5cf6" alt="MCP"></a>
+	<a href="LICENSE"><img src="https://img.shields.io/github/license/aimuzov/thinks-mcp" alt="License"></a>
+</p>
+
+<h3 align="center">Your own voice as an MCP tool</h3>
+<p align="center">A style profile and your real messages from a Telegram export, no API keys and no generation of its own</p>
 
 An MCP server that writes, replies and rephrases in your own voice, learned from
 a Telegram export and your git history.
@@ -29,14 +45,23 @@ within 90 seconds of each other. That is what real chat looks like — a sizeabl
 share of messages arrive in bursts, a thought split across several short replies
 instead of one paragraph. Indexing single messages would teach the opposite.
 
+## Two ways to use it
+
+- **Hosted connector** at `https://thinks-mcp.aimuzov.online/mcp`: sign in with
+  Telegram, upload the export on the account page, and the corpus is built on
+  the server. Nothing to install.
+- **Local server** over stdio: the export and the index stay on your machine,
+  and the code corpus from your repositories is available too.
+
 ## Install
 
 Node 26 or newer. The corpus and the search are built on `node:sqlite` with
 FTS5, and the shared kit underneath targets Node 26.
 
-### Through mise
+### Through npx or mise
 
 ```bash
+npx -y @aimuzov/thinks-mcp where
 mise use -g npm:@aimuzov/thinks-mcp
 ```
 
@@ -48,8 +73,8 @@ npm ci && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
 
 Note that `npm i -g` installs the binary into whichever Node version is active
 at that moment. If mise switches versions, `thinks-mcp` disappears from `PATH` —
-so in an MCP host config prefer launching through `mise exec` over relying on
-the bare command name.
+so in an MCP host config prefer `npx` or `mise exec` over relying on the bare
+command name.
 
 ## Building the chat corpus
 
@@ -103,6 +128,24 @@ version.
 
 ## Connecting
 
+### Hosted connector
+
+In Claude: Settings → Connectors → Add custom connector →
+`https://thinks-mcp.aimuzov.online/mcp`. In Claude Code:
+
+```bash
+claude mcp add --transport http thinks https://thinks-mcp.aimuzov.online/mcp
+```
+
+Sign-in goes through the Telegram Login widget. The account page at
+`/account` takes the export (JSON, up to 1 GB), builds the corpus in the
+background, keeps the settings (marks you never type, chats to skip, the recency
+window, the voice mode) and deletes everything on request. The uploaded export
+is removed once the build finishes, whatever the outcome; the server keeps
+only the index, one per Telegram account.
+
+### Local server
+
 Copy `.mcp.json.example` to `.mcp.json`:
 
 ```json
@@ -116,22 +159,18 @@ Copy `.mcp.json.example` to `.mcp.json`:
 }
 ```
 
-Installed from source with `npm i -g`, launch through the Node version the
-binary landed in:
-
-```json
-{
-	"mcpServers": {
-		"thinks": {
-			"command": "/opt/homebrew/bin/mise",
-			"args": ["x", "node@24", "--", "thinks-mcp"]
-		}
-	}
-}
-```
+`"command": "npx", "args": ["-y", "@aimuzov/thinks-mcp"]` works the same.
 
 The server starts even with no corpus built and says what to do — so a machine
 that has not imported an archive yet gets a working server, not a failed one.
+
+### Voice mode
+
+With `THINKS_VOICE=1`, or the checkbox on the account page, the server sends the
+profile as its instructions, and Claude talks to you in your own voice rather
+than only writing on your behalf. Instructions are read when a client connects,
+so a change works from the next conversation. For clients that ignore
+instructions there is the `talk-like-me` prompt.
 
 ## Tools
 
@@ -172,7 +211,7 @@ limitation is real — it compares words, so a Russian comment over English
 identifiers cannot be judged and the check stays quiet.
 
 Resources: `style://profile` and `style://profile/{register}`, the profile as
-markdown. Prompts: `as-me`, `reply-as-me` and `comment-as-me`.
+markdown. Prompts: `as-me`, `reply-as-me`, `comment-as-me` and `talk-like-me`.
 
 The loop those prompts set up: get a brief → write → `check_as_me` → rewrite
 against the findings until the score is high.
@@ -267,7 +306,9 @@ thinks-mcp code <repos...>      # build the comment corpus
 thinks-mcp profile jsdoc        # print the profile for a register
 thinks-mcp where                # where the index lives
 thinks-mcp holdout --answers    # blind quality check
+thinks-mcp export <file>        # a copy of the corpus for the server, without the git blame cache
 thinks-mcp serve                # same as no arguments
+thinks-mcp serve --http         # the hosted connector
 thinks-mcp --help
 ```
 
@@ -300,14 +341,36 @@ said.
 | `THINKS_BURST_WINDOW`           | `90`                                                    | burst window in seconds                                                  |
 | `THINKS_LONGFORM_MIN`           | `300`                                                   | longform threshold in characters                                         |
 | `THINKS_HOLDOUT`                | `20`                                                    | pairs held out for the blind check                                       |
+| `THINKS_VOICE`                  | empty                                                   | `1` turns the voice mode on                                              |
+| `LOG_LEVEL`                     | `info`                                                  | `error`, `warn`, `info` or `debug`                                       |
+
+The hosted connector, `serve --http`, is configured by the environment only, see
+[.env.example](.env.example):
+
+| Variable                | Default | Purpose                                                                |
+| ----------------------- | ------- | ---------------------------------------------------------------------- |
+| `PUBLIC_URL`            |         | public origin; the bot's domain in BotFather (`/setdomain`) must match |
+| `AUTH_SECRET`           |         | signs the tokens and the session, 32 characters or more                |
+| `TELEGRAM_BOT_TOKEN`    |         | the bot behind the widget, only its signature is checked               |
+| `TELEGRAM_BOT_NAME`     |         | the bot's username for the widget                                      |
+| `THINKS_DATA_DIR`       |         | `auth.db` and one folder per Telegram account                          |
+| `THINKS_MAX_UPLOAD_MB`  | `1024`  | largest accepted export                                                |
+| `THINKS_BUILD_HEAP_MB`  | `1024`  | heap of the build process                                              |
+| `THINKS_DEV_USER_ID`    |         | sign in without the widget, refused unless `PUBLIC_URL` is localhost   |
+| `PORT`                  | `8080`  |                                                                        |
+| `ALLOWED_REDIRECT_URIS` |         | OAuth callbacks besides Claude and loopback                            |
+
+It runs on the projects server in Docker behind the shared Caddy, see
+[deploy/](deploy). A release deploys itself.
 
 ## Dependencies
 
-`@modelcontextprotocol/sdk` and `zod`, and that is all. Full-text search runs on
-FTS5 from Node's built-in `node:sqlite`; the Russian and English stemmers are
-written here (`src/search/stem.ts`) because FTS5 tokenises both scripts but
-knows no morphology.
+`@modelcontextprotocol/sdk`, `zod` and [infra-mcp-kit](https://github.com/aimuzov/infra-mcp-kit)
+with express for the hosted connector. Full-text search runs on FTS5 from
+Node's built-in `node:sqlite`; the Russian and English stemmers are written
+here (`src/search/stem.ts`) because FTS5 tokenises both scripts but knows no
+morphology.
 
 ## License
 
-MIT
+[MIT](LICENSE)
