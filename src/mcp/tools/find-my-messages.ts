@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { Register } from '#thinks/corpus/types'
-import { CORPUS_MISSING, type ToolContext } from '#thinks/mcp/context'
+import { type ToolContext } from '#thinks/mcp/context'
 import { searchTurns } from '#thinks/search/query'
 
 import { langSchema, registerSchema } from './shared.ts'
@@ -42,7 +42,7 @@ export function registerFindMyMessages(server: McpServer, ctx: ToolContext) {
 		async (args: FindInput) => {
 			const corpus = ctx.corpus.get()
 
-			if (!corpus) return failure(CORPUS_MISSING)
+			if (!corpus) return failure(ctx.corpus.missing())
 
 			const rows = searchTurns(corpus.db, args.query, {
 				register: args.register,

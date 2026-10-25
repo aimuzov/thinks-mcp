@@ -178,7 +178,7 @@ describe('MCP over HTTP', () => {
 
 		const stranger = await connect(STRANGER)
 
-		assert.ok(textOf(await stranger.callTool(brief)).includes('Корпус не собран'))
+		assert.ok(textOf(await stranger.callTool(brief)).includes('загрузи result.json в кабинете'))
 	})
 })
 

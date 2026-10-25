@@ -95,7 +95,7 @@ export class Users {
 			// Re-insert to mark it as most recently used.
 			this.open.delete(userId)
 		} else {
-			ref = new CorpusRef(this.config(userId))
+			ref = new CorpusRef(this.config(userId), 'hosted')
 		}
 
 		this.open.set(userId, ref)

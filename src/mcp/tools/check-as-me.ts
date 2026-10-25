@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
 import type { Register } from '#thinks/corpus/types'
-import { CORPUS_MISSING, type ToolContext } from '#thinks/mcp/context'
+import { type ToolContext } from '#thinks/mcp/context'
 import { checkText, renderCheck } from '#thinks/style/check'
 
 import { registerSchema } from './shared.ts'
@@ -45,7 +45,7 @@ export function registerCheckAsMe(server: McpServer, ctx: ToolContext) {
 		async (args: CheckInput) => {
 			const corpus = ctx.corpus.get()
 
-			if (!corpus) return failure(CORPUS_MISSING)
+			if (!corpus) return failure(ctx.corpus.missing())
 
 			const report = checkText(args.text, corpus.profile, args.register ?? 'dm', args.code)
 

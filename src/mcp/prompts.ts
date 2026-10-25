@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 
-import { CORPUS_MISSING, type ToolContext } from './context.ts'
+import { type ToolContext } from './context.ts'
 import { voiceInstructions } from './voice.ts'
 
 /**
@@ -29,7 +29,7 @@ export function registerPrompts(server: McpServer, ctx: ToolContext) {
 						role: 'user' as const,
 						content: {
 							type: 'text' as const,
-							text: corpus ? voiceInstructions(corpus.profile) : CORPUS_MISSING,
+							text: corpus ? voiceInstructions(corpus.profile) : ctx.corpus.missing(),
 						},
 					},
 				],

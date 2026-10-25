@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 import type { Register } from '#thinks/corpus/types'
 import { renderBrief } from '#thinks/mcp/brief'
-import { CORPUS_MISSING, type Corpus, type ToolContext } from '#thinks/mcp/context'
+import { type Corpus, type ToolContext } from '#thinks/mcp/context'
 import { searchTurns } from '#thinks/search/query'
 
 import { DEFAULT_EXAMPLES, examplesSchema, registerSchema } from './shared.ts'
@@ -53,7 +53,7 @@ export function registerRephraseAsMe(server: McpServer, ctx: ToolContext) {
 		async (args: RephraseInput) => {
 			const corpus = ctx.corpus.get()
 
-			if (!corpus) return failure(CORPUS_MISSING)
+			if (!corpus) return failure(ctx.corpus.missing())
 
 			return text(buildRephraseBrief(corpus, args))
 		},

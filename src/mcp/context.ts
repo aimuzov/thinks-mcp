@@ -10,11 +10,26 @@ export type Corpus = {
 	profile: StyleProfile
 }
 
-export const CORPUS_MISSING =
-	'Корпус не собран, поэтому отвечать твоим голосом пока не из чего.\n' +
-	'Выгрузи архив Telegram (Settings > Advanced > Export Telegram data, JSON) ' +
-	'и запусти:\n\n  thinks-mcp build <путь к result.json>\n\n' +
-	'Пересобирать сервер после этого не нужно -- он подхватит корпус сам.'
+const BUILD_HINT = {
+	cli:
+		'Выгрузи архив Telegram (Settings > Advanced > Export Telegram data, JSON) ' +
+		'и запусти:\n\n  thinks-mcp build <путь к result.json>\n\n' +
+		'Пересобирать сервер после этого не нужно -- он подхватит корпус сам.',
+	hosted:
+		'Выгрузи архив Telegram (Settings > Advanced > Export Telegram data, JSON) ' +
+		'и загрузи result.json в кабинете. Переподключаться после сборки не нужно.',
+}
+
+export type CorpusMode = keyof typeof BUILD_HINT
+
+/** Why there is no corpus, and what to do about it in this mode. */
+export function corpusMissing(mode: CorpusMode, dbExists: boolean): string {
+	const why = dbExists
+		? 'Корпус собран не до конца: в базе нет профиля, похоже, сборка оборвалась.'
+		: 'Корпус не собран, поэтому отвечать твоим голосом пока не из чего.'
+
+	return `${why}\n${BUILD_HINT[mode]}`
+}
 
 /**
  * Lazy handle on the corpus.
@@ -29,9 +44,16 @@ export class CorpusRef {
 	private corpus: Corpus | null = null
 
 	private readonly cfg: Config
+	private readonly mode: CorpusMode
 
-	constructor(cfg: Config) {
+	constructor(cfg: Config, mode: CorpusMode = 'cli') {
 		this.cfg = cfg
+		this.mode = mode
+	}
+
+	/** What to tell the user when get() returned null. */
+	missing(): string {
+		return corpusMissing(this.mode, existsSync(this.cfg.dbPath))
 	}
 
 	get(): Corpus | null {
