@@ -1,7 +1,7 @@
 import type { Config } from '#thinks/config'
 import { pseudonym } from '#thinks/corpus/parse'
 import { stemsOf } from '#thinks/search/stem'
-import { nextTurnId, openDb, rebuildIndexes, resetRegisters, run, setMeta } from '#thinks/store/db'
+import { nextTurnId, openDb, rebuildIndexes, resetRegisters, run, setMeta, storedParts } from '#thinks/store/db'
 import { measureCode } from '#thinks/style/code-metrics'
 import { loadProfile, measureRegisters, saveCodeProfile } from '#thinks/style/profile'
 
@@ -89,7 +89,7 @@ export function buildCodeCorpus(
 				c.isDoc ? 'jsdoc' : 'code',
 				c.lang,
 				c.year,
-				JSON.stringify(c.lines),
+				storedParts(c.lines, c.text),
 				c.text,
 				c.lines.length,
 				c.text.length,
