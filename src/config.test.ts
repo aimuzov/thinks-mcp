@@ -41,7 +41,7 @@ describe('loadConfig', () => {
 	it('parses tuning knobs and falls back to defaults', () => {
 		const cfg = loadConfig({
 			THINKS_BURST_WINDOW: '120',
-			THINKS_HOLDOUT: 'нечисло',
+			THINKS_HOLDOUT: ' ',
 			THINKS_CHAT_STOPLIST: ' Чат один , Чат два ,,',
 		})
 
@@ -62,7 +62,7 @@ describe('loadConfig', () => {
 	})
 
 	it('falls back to three recent years and no emails', () => {
-		const cfg = loadConfig({ THINKS_RECENT_YEARS: 'abc' })
+		const cfg = loadConfig({ THINKS_RECENT_YEARS: '' })
 
 		assert.equal(cfg.recentYears, 3)
 		assert.deepEqual(cfg.codeEmails, [])
@@ -90,5 +90,15 @@ describe('loadConfig', () => {
 
 		assert.equal(cfg.dumpPath, '/mnt/export/result.json')
 		assert.equal(cfg.ownerId, 'user42')
+	})
+
+	it('позволяет выключить holdout нулём', () => {
+		assert.equal(loadConfig({ THINKS_HOLDOUT: '0' }).holdoutSize, 0)
+	})
+
+	it('падает на мусоре и называет переменную', () => {
+		assert.throws(() => loadConfig({ THINKS_HOLDOUT: 'нечисло' }), /THINKS_HOLDOUT/)
+		assert.throws(() => loadConfig({ THINKS_BURST_WINDOW: '12abc' }), /THINKS_BURST_WINDOW/)
+		assert.throws(() => loadConfig({ THINKS_RECENT_YEARS: '0' }), /THINKS_RECENT_YEARS/)
 	})
 })

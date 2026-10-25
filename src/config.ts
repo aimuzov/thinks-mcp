@@ -95,15 +95,32 @@ export function loadConfig(env: Env = process.env): Config {
 		dbPath: env.THINKS_DB?.trim() || join(dataDir, 'style.db'),
 		ownerId: env.THINKS_OWNER_ID?.trim() ?? '',
 		chatStopList: splitList(env.THINKS_CHAT_STOPLIST),
-		burstWindowSeconds: Number.parseInt(env.THINKS_BURST_WINDOW ?? '', 10) || DEFAULT_BURST_WINDOW_SECONDS,
-		longformMinChars: Number.parseInt(env.THINKS_LONGFORM_MIN ?? '', 10) || DEFAULT_LONGFORM_MIN_CHARS,
-		holdoutSize: Number.parseInt(env.THINKS_HOLDOUT ?? '', 10) || DEFAULT_HOLDOUT_SIZE,
+		burstWindowSeconds: intVar(env, 'THINKS_BURST_WINDOW', DEFAULT_BURST_WINDOW_SECONDS, 1),
+		longformMinChars: intVar(env, 'THINKS_LONGFORM_MIN', DEFAULT_LONGFORM_MIN_CHARS, 1),
+		holdoutSize: intVar(env, 'THINKS_HOLDOUT', DEFAULT_HOLDOUT_SIZE, 0),
 		codeEmails: splitList(env.THINKS_CODE_EMAILS),
-		recentYears: Number.parseInt(env.THINKS_RECENT_YEARS ?? '', 10) || DEFAULT_RECENT_YEARS,
-		codeHandwrittenUntil: Number.parseInt(env.THINKS_CODE_HANDWRITTEN_UNTIL ?? '', 10) || 0,
+		recentYears: intVar(env, 'THINKS_RECENT_YEARS', DEFAULT_RECENT_YEARS, 1),
+		codeHandwrittenUntil: intVar(env, 'THINKS_CODE_HANDWRITTEN_UNTIL', 0, 0),
 		neverMarks: parseNeverMarks(env.THINKS_NEVER_MARKS),
 		voice: env.THINKS_VOICE?.trim() === '1',
 	}
+}
+
+/**
+ * An integer knob: unset or blank means the default, anything else must be a
+ * whole number of at least `min`.
+ */
+function intVar(env: Env, name: string, fallback: number, min: number): number {
+	const raw = env[name]?.trim()
+
+	if (!raw) return fallback
+
+	// parseInt проглотил бы "12abc" и молча дал бы 12.
+	if (!/^-?\d+$/.test(raw) || Number(raw) < min) {
+		throw new Error(`${name}: нужно целое число не меньше ${min}, а задано "${raw}"`)
+	}
+
+	return Number(raw)
 }
 
 /**
