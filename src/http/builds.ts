@@ -66,6 +66,7 @@ export function childRunner(heapMb: number): BuildRunner {
 				{ stdio: ['ignore', 'pipe', 'pipe'] },
 			)
 			let stderr = ''
+			let outOfMemory = false
 			let settled = false
 			const done = (error: string | null) => {
 				if (settled) return
@@ -84,7 +85,11 @@ export function childRunner(heapMb: number): BuildRunner {
 			child.stderr.setEncoding('utf8')
 
 			child.stderr.on('data', (chunk: string) => {
-				stderr = (stderr + chunk).slice(-STDERR_TAIL)
+				const seen = stderr + chunk
+
+				// V8 пишет про кучу в начале длинного дампа, и в хвост эта строка не попадает.
+				outOfMemory ||= OUT_OF_MEMORY.test(seen)
+				stderr = seen.slice(-STDERR_TAIL)
 			})
 
 			// ENOMEM или EAGAIN при запуске: без обработчика это uncaught
@@ -97,7 +102,7 @@ export function childRunner(heapMb: number): BuildRunner {
 			child.on('close', (code, signal) => {
 				if (code !== 0) log.error(`Сборка ${job.userId} упала`, { code, signal, stderr })
 
-				done(exitMessage(code, signal, stderr))
+				done(exitMessage(code, signal, stderr, outOfMemory))
 			})
 		})
 }
@@ -105,11 +110,18 @@ export function childRunner(heapMb: number): BuildRunner {
 /** Хвост stderr, который хранится для лога; весь вывод сборки не нужен. */
 const STDERR_TAIL = 8 * 1024
 
+const OUT_OF_MEMORY = /heap out of memory|Reached heap limit/i
+
 /** What the user is told about a finished worker; null when it succeeded. */
-export function exitMessage(code: number | null, signal: string | null, stderr: string): string | null {
+export function exitMessage(
+	code: number | null,
+	signal: string | null,
+	stderr: string,
+	outOfMemory = OUT_OF_MEMORY.test(stderr),
+): string | null {
 	if (code === 0) return null
 
-	if (/heap out of memory|Reached heap limit/i.test(stderr)) return 'Сборке не хватило памяти'
+	if (outOfMemory) return 'Сборке не хватило памяти'
 
 	// SIGKILL без текста в stderr чаще всего от OOM killer ядра.
 	if (signal === 'SIGKILL') return 'Сборку остановила система, скорее всего не хватило памяти'

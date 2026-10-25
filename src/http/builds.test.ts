@@ -297,26 +297,18 @@ describe('childRunner', () => {
 		}
 	})
 
-	it(
-		'сообщает о нехватке памяти, когда воркеру мало кучи',
-		{
-			skip:
-				'bug: V8 печатает строку про heap out of memory в начале ~9 КБ stderr, а childRunner хранит последние 8 КБ, ' +
-				'и человек видит «прервана сигналом SIGABRT»',
-		},
-		async () => {
-			const { job, runner } = run(16)
-			const big = makeDump()
-			const chat = big.chats.list[0]!
+	it('сообщает о нехватке памяти, когда воркеру мало кучи', async () => {
+		const { job, runner } = run(16)
+		const big = makeDump()
+		const chat = big.chats.list[0]!
 
-			// Шестьдесят тысяч сообщений в куче на 16 МБ не разобрать.
-			for (let i = 0; i < 60_000; i++) chat.messages.push({ ...chat.messages[1]!, id: 10_000 + i })
+		// Шестьдесят тысяч сообщений в куче на 16 МБ не разобрать.
+		for (let i = 0; i < 60_000; i++) chat.messages.push({ ...chat.messages[1]!, id: 10_000 + i })
 
-			writeFileSync(job.dumpPath, JSON.stringify(big))
+		writeFileSync(job.dumpPath, JSON.stringify(big))
 
-			assert.match((await runner(job, () => {})) ?? '', /памяти/)
-		},
-	)
+		assert.match((await runner(job, () => {})) ?? '', /памяти/)
+	})
 
 	it('не роняет процесс, когда воркер не запустился', async () => {
 		const { job, runner } = run()

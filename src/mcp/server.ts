@@ -1,7 +1,7 @@
 import { readVersion } from '@aimuzov/infra-mcp-kit'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
-import { ensureDataDir, type Config } from '#thinks/config'
+import type { Config } from '#thinks/config'
 
 import { CorpusRef, type ToolContext } from './context.ts'
 import { registerPrompts } from './prompts.ts'
@@ -21,10 +21,11 @@ const VERSION = readVersion(import.meta.url)
  * Never throws for a missing corpus: the server is meant to live in a global
  * MCP config, and a machine that has not imported an archive yet should see a
  * working server that explains what to do, not a failed one.
+ *
+ * Creates nothing on disk: in the hosted mode a token of a deleted account
+ * would bring its directory back.
  */
 export function createServer(cfg: Config, corpus: CorpusRef = new CorpusRef(cfg)): McpServer {
-	ensureDataDir(cfg)
-
 	const ctx: ToolContext = { cfg, corpus }
 	// Instructions are read once, when the client connects: a corpus built or a
 	// switch flipped later takes effect in the next conversation.

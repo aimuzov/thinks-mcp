@@ -82,7 +82,7 @@ export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }:
 
 			return createServer(users.config(userId), users.corpus(userId))
 		},
-		routes: (app, context) => mountAccount(app, context, { cfg, users, builds }),
+		routes: (app, context) => mountAccount(app, context, { cfg, store, users, builds }),
 	})
 
 	return app
@@ -90,11 +90,12 @@ export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }:
 
 type AccountDeps = {
 	cfg: ThinksHttpConfig
+	store: AuthStore
 	users: Users
 	builds: Builds
 }
 
-function mountAccount(app: Express, { tokens }: HttpContext, { cfg, users, builds }: AccountDeps) {
+function mountAccount(app: Express, { tokens }: HttpContext, { cfg, store, users, builds }: AccountDeps) {
 	const { publicUrl } = cfg.http
 	const session = sessions(tokens, publicUrl, SESSION_COOKIE)
 	const signedIn = requireSession(session)
@@ -171,7 +172,7 @@ function mountAccount(app: Express, { tokens }: HttpContext, { cfg, users, build
 		sendJson(res, state(userId, String(res.locals.session.name ?? '')), 202)
 	})
 
-	app.post('/account/settings', origin, signedIn, express.json({ limit: '16kb' }), (req, res) => {
+	app.post('/account/settings', origin, signedIn, jsonBody('16kb'), (req, res) => {
 		// Старая форма кабинета слала urlencoded, и вкладка, открытая до деплоя, пришла бы
 		// с пустым для express.json телом: настройки сбросились бы к умолчаниям.
 		if (!req.is('application/json')) {
@@ -201,10 +202,34 @@ function mountAccount(app: Express, { tokens }: HttpContext, { cfg, users, build
 			return void apiError(res, 409, 'busy', 'Дождись конца сборки, потом удаляй аккаунт')
 		}
 
+		// Токены MCP-клиентов живут дольше сессии кабинета: без отзыва
+		// клиент продолжил бы ходить в удалённый аккаунт.
+		store.revokeSubject(userId)
 		users.remove(userId)
 		session.clear(res)
 		sendJson(res, { ok: true })
 	})
+}
+
+/**
+ * express.json, чья ошибка разбора -- 400 с кодом, а не 500 из общего
+ * обработчика: битое тело прислал клиент, сервер тут ни при чём.
+ */
+function jsonBody(limit: string): express.RequestHandler {
+	const parse = express.json({ limit })
+
+	return (req, res, next) =>
+		parse(req, res, (err?: unknown) => {
+			if (!err) return next()
+
+			const type = (err as { type?: string }).type
+
+			if (type === 'entity.too.large') return apiError(res, 413, 'too_large', 'Слишком большой запрос')
+
+			if (type === 'entity.parse.failed') return apiError(res, 400, 'bad_json', 'Не удалось прочитать настройки')
+
+			next(err)
+		})
 }
 
 class TooLarge extends Error {}

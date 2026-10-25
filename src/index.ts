@@ -195,7 +195,13 @@ await runCli({
 	name: 'thinks-mcp',
 	version: readVersion(import.meta.url),
 	usage: USAGE,
-	stdio: () => createServer(loadConfig()),
+	stdio: () => {
+		const cfg = loadConfig()
+
+		ensureDataDir(cfg)
+
+		return createServer(cfg)
+	},
 	http: serveHttp,
 	commands: { build, code, profile, holdout, export: exportCorpus, where },
 })

@@ -532,16 +532,13 @@ describe('account', () => {
 		assert.equal(existsSync(join(users.dir(OWNER), 'settings.json')), false)
 	})
 
-	it(
-		'отвечает 400, а не 500, на битый JSON в настройках',
-		{ skip: 'bug: ошибка express.json уходит в общий обработчик и становится 500 internal' },
-		async () => {
-			const cookie = await sessionCookie(OWNER)
-			const res = await post('/account/settings', { cookie, origin: http.base, body: '{"recentYears": ' })
+	it('отвечает 400, а не 500, на битый JSON в настройках', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const res = await post('/account/settings', { cookie, origin: http.base, body: '{"recentYears": ' })
 
-			assert.equal(res.status, 400)
-		},
-	)
+		assert.equal(res.status, 400)
+		assert.equal(await errorCode(res), 'bad_json')
+	})
 
 	it('чистит строки настроек и отдаёт их в состоянии кабинета', async () => {
 		const cookie = await sessionCookie(OWNER)
@@ -737,37 +734,25 @@ describe('account', () => {
 		assert.equal(builds.status(OWNER), null)
 	})
 
-	it(
-		'после удаления аккаунта отзывает выданные MCP-клиентам токены',
-		{
-			skip: 'bug: /account/delete не вызывает store.revokeSubject, токены доступа и refresh продолжают работать',
-		},
-		async () => {
-			seedCorpus(OWNER)
+	it('после удаления аккаунта отзывает выданные MCP-клиентам токены', async () => {
+		seedCorpus(OWNER)
 
-			const flow = await oauthFlow({ base: http.base, login: widget(OWNER) })
+		const flow = await oauthFlow({ base: http.base, login: widget(OWNER) })
 
-			assert.equal((await deleteAccount(await sessionCookie(OWNER))).status, 200)
-			await assert.rejects(connectHttp(http.base, flow.tokens.access_token))
-			assert.equal((await flow.refresh()).status, 400)
-		},
-	)
+		assert.equal((await deleteAccount(await sessionCookie(OWNER))).status, 200)
+		await assert.rejects(connectHttp(http.base, flow.tokens.access_token))
+		assert.equal((await flow.refresh()).status, 400)
+	})
 
-	it(
-		'после удаления аккаунта MCP с прежним токеном не воскрешает каталог пользователя',
-		{
-			skip: 'bug: createServer -> ensureDataDir заново создаёт users/<id>/ для удалённого пользователя',
-		},
-		async () => {
-			seedCorpus(OWNER)
+	it('после удаления аккаунта MCP с прежним токеном не воскрешает каталог пользователя', async () => {
+		seedCorpus(OWNER)
 
-			const { tokens } = await oauthFlow({ base: http.base, login: widget(OWNER) })
+		const { tokens } = await oauthFlow({ base: http.base, login: widget(OWNER) })
 
-			await deleteAccount(await sessionCookie(OWNER))
-			await connectHttp(http.base, tokens.access_token).catch(() => {})
-			assert.equal(existsSync(users.dir(OWNER)), false)
-		},
-	)
+		await deleteAccount(await sessionCookie(OWNER))
+		await connectHttp(http.base, tokens.access_token).catch(() => {})
+		assert.equal(existsSync(users.dir(OWNER)), false)
+	})
 
 	it('после удаления заново пускает в пустой кабинет', async () => {
 		seedCorpus(OWNER)
