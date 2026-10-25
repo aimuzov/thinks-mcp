@@ -9,6 +9,7 @@ import { ensureDataDir, loadConfig } from './config.ts'
 import { buildCorpus, formatReport } from './corpus/build.ts'
 import type { Register } from './corpus/types.ts'
 import { serveHttp } from './http/app.ts'
+import { corpusMissing } from './mcp/context.ts'
 import { createServer } from './mcp/server.ts'
 import { holdoutTurns } from './search/query.ts'
 import { openDb } from './store/db.ts'
@@ -165,8 +166,7 @@ function defaultEmails(): string[] {
 	}
 }
 
-const notBuilt = (dbPath: string) =>
-	`Корпус не собран: ${dbPath} не найден.\n` + 'Запусти `thinks-mcp build <путь к выгрузке Telegram>`.'
+const notBuilt = (dbPath: string) => `${corpusMissing('cli', existsSync(dbPath))}\n\nБаза: ${dbPath}`
 
 function openCorpusOrFail(dbPath: string) {
 	if (!existsSync(dbPath)) throw new Error(notBuilt(dbPath))

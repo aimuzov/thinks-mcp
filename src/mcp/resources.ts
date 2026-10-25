@@ -4,7 +4,7 @@ import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { Register } from '#thinks/corpus/types'
 import { REGISTERS, renderProfile } from '#thinks/style/profile'
 
-import { CORPUS_MISSING, type ToolContext } from './context.ts'
+import { type ToolContext } from './context.ts'
 
 /**
  * The profile as a readable document. Worth exposing on its own: it is the one
@@ -15,7 +15,7 @@ export function registerResources(server: McpServer, ctx: ToolContext) {
 	const render = (register: Register) => {
 		const corpus = ctx.corpus.get()
 
-		return corpus ? renderProfile(corpus.profile, register, { full: true }) : CORPUS_MISSING
+		return corpus ? renderProfile(corpus.profile, register, { full: true }) : ctx.corpus.missing()
 	}
 
 	server.registerResource(

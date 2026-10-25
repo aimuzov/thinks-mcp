@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { createServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { signTelegramLogin, sqliteStore, Tokens } from '@aimuzov/infra-mcp-kit/http'
 import { connectHttp, oauthFlow, startHttp, textOf, type RunningHttp } from '@aimuzov/infra-mcp-kit/testing'
+import express from 'express'
 
 import { buildCorpus } from '#thinks/corpus/build'
 import { makeDump } from '#thinks/testing/fixtures'
 
-import { createApp } from './app.ts'
+import { createApp, listen } from './app.ts'
 import { migrateAuthDb } from './auth-db.ts'
 import { Builds, type BuildRunner } from './builds.ts'
 import type { ThinksHttpConfig } from './config.ts'
@@ -26,6 +28,8 @@ const STRANGER = '2'
 const inProcess =
 	(users: Users): BuildRunner =>
 	async (job) => {
+		await gate
+
 		try {
 			buildCorpus({ ...users.config(job.userId), ...job }, () => {}, { expectOwnerId: `user${job.userId}` })
 
@@ -34,6 +38,18 @@ const inProcess =
 			return (err as Error).message
 		}
 	}
+
+/** Builds wait on this while a test holds them; see hold(). */
+let gate: Promise<void> = Promise.resolve()
+
+/** Keep builds from finishing until the returned function is called. */
+function hold(): () => void {
+	let release!: () => void
+
+	gate = new Promise((r) => (release = r))
+
+	return release
+}
 
 let dataDir: string
 let http: RunningHttp
@@ -164,7 +180,7 @@ describe('MCP over HTTP', () => {
 
 		const stranger = await connect(STRANGER)
 
-		assert.ok(textOf(await stranger.callTool(brief)).includes('Корпус не собран'))
+		assert.ok(textOf(await stranger.callTool(brief)).includes('загрузи result.json в кабинете'))
 	})
 })
 
@@ -180,6 +196,22 @@ describe('account', () => {
 
 		return res.headers.get('set-cookie')?.split(';')[0] ?? ''
 	}
+
+	const deleteAccount = (cookie: string) =>
+		fetch(`${http.base}/account/delete`, {
+			method: 'POST',
+			headers: { cookie, origin: http.base },
+			redirect: 'manual',
+		})
+
+	/** A body without content-length, fed by `feed` as the test sees fit. */
+	const streamUpload = (cookie: string, feed: (push: ReadableStreamDefaultController<Uint8Array>) => void) =>
+		fetch(`${http.base}/account/upload`, {
+			method: 'PUT',
+			headers: { cookie, origin: http.base, 'content-type': 'application/octet-stream' },
+			body: new ReadableStream<Uint8Array>({ start: feed }),
+			duplex: 'half',
+		} as RequestInit)
 
 	const upload = (cookie: string, body: string, origin = http.base) =>
 		fetch(`${http.base}/account/upload`, {
@@ -230,6 +262,74 @@ describe('account', () => {
 		const cookie = await sessionCookie(OWNER)
 
 		assert.equal((await upload(cookie, '{}', 'https://evil.example')).status, 403)
+	})
+
+	it('отвечает 500, а не 413, когда файл не записать', async () => {
+		const cookie = await sessionCookie(OWNER)
+
+		// Каталог только на чтение: запись падает с EACCES, как упала бы с ENOSPC.
+		mkdirSync(users.dir(OWNER), { recursive: true })
+		chmodSync(users.dir(OWNER), 0o500)
+
+		try {
+			assert.equal((await upload(cookie, JSON.stringify(makeDump()))).status, 500)
+		} finally {
+			chmodSync(users.dir(OWNER), 0o700)
+		}
+	})
+
+	it('отвечает 413 на файл больше лимита без content-length', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const res = await streamUpload(cookie, (push) => {
+			push.enqueue(new Uint8Array(2 * 1024 * 1024))
+			push.close()
+		})
+
+		assert.equal(res.status, 413)
+	})
+
+	it('не пускает вторую загрузку, пока идёт первая', async () => {
+		const cookie = await sessionCookie(OWNER)
+		let push!: ReadableStreamDefaultController<Uint8Array>
+		const first = streamUpload(cookie, (c) => {
+			push = c
+			c.enqueue(new TextEncoder().encode(JSON.stringify(makeDump())))
+		})
+
+		while (!existsSync(builds.dumpPath(OWNER))) await new Promise((r) => setTimeout(r, 5))
+
+		assert.equal((await upload(cookie, '{}')).status, 409)
+		push.close()
+		assert.equal((await first).status, 202)
+		await builds.idle()
+		assert.equal(builds.status(OWNER)?.state, 'ready')
+	})
+
+	it('не удаляет аккаунт посреди сборки', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const release = hold()
+
+		await upload(cookie, JSON.stringify(makeDump()))
+
+		assert.equal((await deleteAccount(cookie)).status, 409)
+		release()
+		await builds.idle()
+		assert.equal(users.hasCorpus(OWNER), true)
+	})
+
+	it('снимает сборку из очереди, когда аккаунт удаляют', async () => {
+		const release = hold()
+
+		await upload(await sessionCookie(STRANGER), JSON.stringify(makeDump()))
+
+		const cookie = await sessionCookie(OWNER)
+
+		await upload(cookie, JSON.stringify(makeDump()))
+		assert.equal(builds.status(OWNER)?.state, 'queued')
+		assert.equal((await deleteAccount(cookie)).status, 302)
+		release()
+		await builds.idle()
+		assert.equal(existsSync(users.dir(OWNER)), false)
 	})
 
 	it('deletes everything the user has', async () => {
@@ -293,5 +393,21 @@ describe('voice mode', () => {
 		// An unchecked box is simply absent from the form.
 		await save('neverMarks=&chatStopList=&recentYears=3')
 		assert.equal(users.settings(OWNER).voice, false)
+	})
+})
+
+describe('listen', () => {
+	it('отклоняет промис, когда порт занят', async () => {
+		const busy = createServer()
+
+		await new Promise<void>((r) => busy.listen(0, r))
+
+		const { port } = busy.address() as AddressInfo
+
+		try {
+			await assert.rejects(listen(express(), port), { code: 'EADDRINUSE' })
+		} finally {
+			busy.close()
+		}
 	})
 })

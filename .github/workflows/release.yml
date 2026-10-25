@@ -1,20 +1,20 @@
 name: Release
 
-# A merge into main only updates the release PR. Merging that PR cuts a
-# release, the release goes to npm and out to the projects server. A manual run
-# deploys any release tag, e.g. to roll back.
+# Мёрж в main только обновляет релизный PR. Мёрж этого PR выпускает релиз,
+# релиз уходит в npm и на сервер. Ручной запуск публикует и деплоит любой
+# релизный тег, например, чтобы откатиться.
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to deploy, e.g. v1.2.0. Empty deploys the newest main.
+        description: Release tag to publish and deploy, e.g. v1.2.0. Empty deploys the newest main.
         required: false
 
-# One release at a time; a new one does not cancel a build already under way.
+# Релизы идут по одному, новый не прерывает уже начатый деплой.
 concurrency:
-  group: deploy
+  group: release
   cancel-in-progress: false
 
 permissions:
@@ -34,14 +34,15 @@ jobs:
     if: needs.release.outputs.created == 'true'
     uses: ./.github/workflows/check.yml
 
-  # Skipped until npm access is set up. Turned on by the repository variable
-  # `NPM_PUBLISH=true`; without the `NPM_TOKEN` secret it needs trusted publishing.
+  # Пока у пакета нет доступа к npm, публикация пропускается. Включается переменной
+  # репозитория `NPM_PUBLISH=true`; без секрета `NPM_TOKEN` нужен trusted publishing.
   publish:
     needs: [release, check]
-    # `!cancelled()` rather than `always()`: the job runs when release and check
-    # are skipped (a manual run), but a cancelled run does not publish.
+    # `!cancelled()`, а не `always()`: job идёт и при пропущенных release и check
+    # (ручной запуск), но отменённый прогон не публикует.
     if: >-
-      !cancelled() && vars.NPM_PUBLISH == 'true' && needs.check.result == 'success'
+      !cancelled() && vars.NPM_PUBLISH == 'true' &&
+      (github.event_name == 'workflow_dispatch' && inputs.tag != '' || needs.check.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -53,11 +54,11 @@ jobs:
     steps:
       - uses: aimuzov/infra-mcp-kit/publish@v1
         with:
-          ref: ${{ needs.release.outputs.tag }}
+          ref: ${{ needs.release.outputs.tag || inputs.tag }}
           npm-token: ${{ secrets.NPM_TOKEN }}
 
-  # Skipped until the server is ready (key, clone in /srv, site in Caddy).
-  # Turned on by the repository variable `DEPLOY_ENABLED=true`.
+  # Пока сервер не готов (ключ, клон в /srv, сайт в Caddy), деплой пропускается.
+  # Включается переменной репозитория `DEPLOY_ENABLED=true`.
   deploy:
     needs: [release, check]
     if: >-

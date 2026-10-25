@@ -39,16 +39,24 @@ export function buildCodeCorpus(
 ): CodeBuildReport {
 	const stats = emptyScanStats()
 	const comments: CodeComment[] = []
+	const valid = repos.filter((repo) => {
+		const ok = isRepo(repo)
+
+		if (!ok) log(`Пропускаю (не git-репозиторий): ${repo}`)
+
+		return ok
+	})
+
+	// Ниже регистры кода пересобираются с нуля, так что опечатка в путях
+	// стёрла бы весь прошлый корпус кода.
+	if (!valid.length) {
+		throw new Error(`Ни один путь не git-репозиторий, корпус кода не тронут: ${repos.join(', ')}`)
+	}
 
 	const db = openDb(cfg.dbPath)
 	const cache = new BlameCache(db)
 
-	for (const repo of repos) {
-		if (!isRepo(repo)) {
-			log(`Пропускаю (не git-репозиторий): ${repo}`)
-			continue
-		}
-
+	for (const repo of valid) {
 		stats.repos++
 		const found = scanRepo(repo, { emails }, stats, cache)
 

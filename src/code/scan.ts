@@ -303,7 +303,13 @@ export function emptyScanStats(): ScanStats {
 export function isRepo(dir: string): boolean {
 	try {
 		return git(dir, ['rev-parse', '--is-inside-work-tree']).trim() === 'true'
-	} catch {
+	} catch (err) {
+		// Без git любой путь выглядел бы "не репозиторием", и сборка молча
+		// стёрла бы корпус кода.
+		if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+			throw new Error('git не найден: поставь git или добавь его в PATH', { cause: err })
+		}
+
 		return false
 	}
 }

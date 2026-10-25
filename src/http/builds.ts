@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { log } from '@aimuzov/infra-mcp-kit'
 
 import type { Users } from './users.ts'
 
@@ -46,22 +47,53 @@ export function childRunner(heapMb: number): BuildRunner {
 				],
 				{ stdio: ['ignore', 'ignore', 'pipe'] },
 			)
-			let lastLine = ''
+			let stderr = ''
+			let settled = false
+			const done = (error: string | null) => {
+				if (settled) return
+
+				settled = true
+				resolve(error)
+			}
 
 			child.stderr.setEncoding('utf8')
 
 			child.stderr.on('data', (chunk: string) => {
-				const lines = chunk.trim().split('\n')
-
-				lastLine = lines[lines.length - 1] || lastLine
+				stderr = (stderr + chunk).slice(-STDERR_TAIL)
 			})
 
-			child.on('close', (code) => {
-				if (code === 0) resolve(null)
-				else if (code === null) resolve('Сборке не хватило памяти')
-				else resolve(lastLine || `Сборка завершилась с кодом ${code}`)
+			// ENOMEM или EAGAIN при запуске: без обработчика это uncaught
+			// exception, и падает весь сервер вместе с чужими сессиями.
+			child.on('error', (err) => {
+				log.error(`Не удалось запустить сборку ${job.userId}`, { error: err.message })
+				done(`Не удалось запустить сборку: ${err.message}`)
+			})
+
+			child.on('close', (code, signal) => {
+				if (code !== 0) log.error(`Сборка ${job.userId} упала`, { code, signal, stderr })
+
+				done(exitMessage(code, signal, stderr))
 			})
 		})
+}
+
+/** Хвост stderr, который хранится для лога; весь вывод сборки не нужен. */
+const STDERR_TAIL = 8 * 1024
+
+/** What the user is told about a finished worker; null when it succeeded. */
+export function exitMessage(code: number | null, signal: string | null, stderr: string): string | null {
+	if (code === 0) return null
+
+	if (/heap out of memory|Reached heap limit/i.test(stderr)) return 'Сборке не хватило памяти'
+
+	// SIGKILL без текста в stderr чаще всего от OOM killer ядра.
+	if (signal === 'SIGKILL') return 'Сборку остановила система, скорее всего не хватило памяти'
+
+	if (signal) return `Сборка прервана сигналом ${signal}`
+
+	const lines = stderr.trim().split('\n')
+
+	return lines[lines.length - 1] || `Сборка завершилась с кодом ${code}`
 }
 
 /**
@@ -74,7 +106,9 @@ export function childRunner(heapMb: number): BuildRunner {
  */
 export class Builds {
 	private readonly queue: string[] = []
-	private running = false
+	/** The user whose build is running now. */
+	private current: string | null = null
+	private readonly uploads = new Set<string>()
 
 	private readonly users: Users
 	private readonly dataDir: string
@@ -90,9 +124,40 @@ export class Builds {
 		return join(this.users.dir(userId), 'upload.json')
 	}
 
+	/**
+	 * Claim dumpPath(userId) for a new upload; false while another upload or a
+	 * build of the same user is under way.
+	 */
+	beginUpload(userId: string): boolean {
+		if (this.uploads.has(userId) || this.queue.includes(userId) || this.current === userId) return false
+
+		this.uploads.add(userId)
+
+		return true
+	}
+
+	endUpload(userId: string): void {
+		this.uploads.delete(userId)
+	}
+
 	/** Drop an upload that never made it to the queue. */
 	discardUpload(userId: string): void {
 		rmSync(this.dumpPath(userId), { force: true })
+	}
+
+	/**
+	 * Take the user's build out of the queue before their files go away.
+	 * False when the build is running or an upload is in flight: neither can
+	 * be stopped half-way, so the caller has to wait.
+	 */
+	cancel(userId: string): boolean {
+		if (this.current === userId || this.uploads.has(userId)) return false
+
+		const at = this.queue.indexOf(userId)
+
+		if (at !== -1) this.queue.splice(at, 1)
+
+		return true
 	}
 
 	status(userId: string): BuildStatus | null {
@@ -109,7 +174,7 @@ export class Builds {
 
 		this.queue.push(userId)
 		this.setStatus(userId, 'queued', 'В очереди')
-		void this.next()
+		this.kick()
 	}
 
 	/**
@@ -129,26 +194,45 @@ export class Builds {
 
 	/** Resolves once the queue is empty. Tests only. */
 	async idle(): Promise<void> {
-		while (this.running || this.queue.length) {
+		while (this.current !== null || this.queue.length) {
 			await new Promise((r) => setTimeout(r, 10))
 		}
 	}
 
+	/** Никто не ждёт этот промис, поэтому ошибку из него надо поймать здесь. */
+	private kick(): void {
+		this.next().catch((err: unknown) => log.error('Очередь сборок сломалась', { error: String(err) }))
+	}
+
 	private async next(): Promise<void> {
-		if (this.running) return
+		if (this.current !== null) return
 
 		const userId = this.queue.shift()
 
 		if (!userId) return
 
-		this.running = true
+		this.current = userId
 
+		try {
+			await this.build(userId)
+		} catch (err) {
+			this.setStatus(userId, 'failed', err instanceof Error ? err.message : String(err))
+		} finally {
+			// Очередь сначала, файл потом: ошибка rmSync не должна её остановить.
+			this.current = null
+			this.kick()
+			this.discardUpload(userId)
+		}
+	}
+
+	private async build(userId: string): Promise<void> {
 		const target = this.users.config(userId).dbPath
 		const tmp = `${target}.building`
 
+		this.setStatus(userId, 'building', 'Собираю корпус')
+		removeDb(tmp)
+
 		try {
-			this.setStatus(userId, 'building', 'Собираю корпус')
-			removeDb(tmp)
 			const error = await this.run({
 				dataDir: this.dataDir,
 				userId,
@@ -156,23 +240,15 @@ export class Builds {
 				dbPath: tmp,
 			})
 
-			if (error) {
-				removeDb(tmp)
-				this.setStatus(userId, 'failed', error)
-			} else {
-				// Swap in the new corpus only now: a failed build leaves the old one.
-				this.users.release(userId)
-				removeDb(target)
-				renameSync(tmp, target)
-				this.setStatus(userId, 'ready', 'Корпус собран')
-			}
-		} catch (err) {
-			removeDb(tmp)
-			this.setStatus(userId, 'failed', err instanceof Error ? err.message : String(err))
+			if (error) return this.setStatus(userId, 'failed', error)
+
+			// Swap in the new corpus only now: a failed build leaves the old one.
+			this.users.release(userId)
+			removeDb(target)
+			renameSync(tmp, target)
+			this.setStatus(userId, 'ready', 'Корпус собран')
 		} finally {
-			rmSync(this.dumpPath(userId), { force: true })
-			this.running = false
-			void this.next()
+			removeDb(tmp)
 		}
 	}
 
@@ -180,10 +256,16 @@ export class Builds {
 		return join(this.users.dir(userId), 'build.json')
 	}
 
-	private setStatus(userId: string, state: BuildState, message: string) {
+	private setStatus(userId: string, state: BuildState, message: string): void {
 		const status: BuildStatus = { state, message, updatedAt: Date.now() }
 
-		writeFileSync(this.statusPath(userId), JSON.stringify(status))
+		try {
+			writeFileSync(this.statusPath(userId), JSON.stringify(status))
+		} catch (err) {
+			// Каталог пользователя могли удалить; статус тогда писать некуда, а
+			// падать из-за него нельзя: процесс один на всех.
+			log.error(`Не удалось записать статус сборки ${userId}`, { state, error: String(err) })
+		}
 	}
 }
 
