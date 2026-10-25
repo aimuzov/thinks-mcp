@@ -208,4 +208,16 @@ describe('isRepo', () => {
 		assert.equal(isRepo(repo), true)
 		assert.equal(isRepo(mkdtempSync(join(tmpdir(), 'thinks-plain-'))), false)
 	})
+
+	it('без git бросает ошибку, а не говорит "не репозиторий"', () => {
+		const path = process.env.PATH
+
+		process.env.PATH = mkdtempSync(join(tmpdir(), 'thinks-nogit-'))
+
+		try {
+			assert.throws(() => isRepo(repo), /git не найден/)
+		} finally {
+			process.env.PATH = path
+		}
+	})
 })
