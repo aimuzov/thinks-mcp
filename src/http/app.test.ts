@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { createServer, type AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { signTelegramLogin, sqliteStore, Tokens } from '@aimuzov/infra-mcp-kit/http'
 import { connectHttp, oauthFlow, startHttp, textOf, type RunningHttp } from '@aimuzov/infra-mcp-kit/testing'
+import express from 'express'
 
 import { buildCorpus } from '#thinks/corpus/build'
 import { makeDump } from '#thinks/testing/fixtures'
 
-import { createApp } from './app.ts'
+import { createApp, listen } from './app.ts'
 import { migrateAuthDb } from './auth-db.ts'
 import { Builds, type BuildRunner } from './builds.ts'
 import type { ThinksHttpConfig } from './config.ts'
@@ -391,5 +393,21 @@ describe('voice mode', () => {
 		// An unchecked box is simply absent from the form.
 		await save('neverMarks=&chatStopList=&recentYears=3')
 		assert.equal(users.settings(OWNER).voice, false)
+	})
+})
+
+describe('listen', () => {
+	it('отклоняет промис, когда порт занят', async () => {
+		const busy = createServer()
+
+		await new Promise<void>((r) => busy.listen(0, r))
+
+		const { port } = busy.address() as AddressInfo
+
+		try {
+			await assert.rejects(listen(express(), port), { code: 'EADDRINUSE' })
+		} finally {
+			busy.close()
+		}
 	})
 })

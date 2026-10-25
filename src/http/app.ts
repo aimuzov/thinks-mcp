@@ -224,7 +224,7 @@ function uploadFailed(res: express.Response, err: unknown, userId: string): void
 }
 
 /** Run the hosted server. Configured entirely from the environment. */
-export function serveHttp(): Promise<Server> {
+export async function serveHttp(): Promise<Server> {
 	const cfg = loadThinksHttpConfig()
 
 	mkdirSync(cfg.dataDir, { recursive: true })
@@ -240,10 +240,18 @@ export function serveHttp(): Promise<Server> {
 
 	const app = createApp({ cfg, store: sqliteStore(authDb), users, builds })
 
-	return new Promise((resolve) => {
-		const server = app.listen(cfg.http.port, () => {
-			log.info(`${SERVICE.name} listening on :${cfg.http.port} as ${cfg.http.publicUrl.href}`)
-			resolve(server)
-		})
+	const server = await listen(app, cfg.http.port)
+
+	log.info(`${SERVICE.name} listening on :${cfg.http.port} as ${cfg.http.publicUrl.href}`)
+
+	return server
+}
+
+/** Resolves once the port is bound; rejects when it cannot be, e.g. EADDRINUSE. */
+export function listen(app: Express, port: number): Promise<Server> {
+	return new Promise((resolve, reject) => {
+		// Express 5 отдаёт ошибку listen в этот же колбэк; без проверки занятый
+		// порт выглядел бы успешным стартом.
+		const server = app.listen(port, (err?: Error) => (err ? reject(err) : resolve(server)))
 	})
 }
