@@ -1,0 +1,27 @@
+---
+// Лендинг кита плюс дорога в кабинет: у thinks без него коннектор пуст, корпус собирают там.
+// Своего слота у лендинга кита нет, поэтому страница перекрыта целиком (`override` в astro.config).
+import config from 'virtual:infra-mcp-kit/pages'
+
+import Connect from '@aimuzov/infra-mcp-kit/astro/components/connect.svelte'
+import Layout from '@aimuzov/infra-mcp-kit/astro/layout.astro'
+
+import LandingAccount from '#frontend/components/landing-account.svelte'
+import LandingTools from '#frontend/components/landing-tools.svelte'
+
+const { service } = config
+---
+
+<Layout title={service.name} screen="landing">
+	<section class="hero">
+		<p class="eyebrow">MCP-коннектор</p>
+		<h1 class="glitch" data-text={service.name}>
+			{service.name}
+		</h1>
+		<p class="tagline">{service.tagline}</p>
+		<p class="lead">{service.lead}</p>
+	</section>
+	<LandingAccount />
+	<Connect client:load name={service.name} />
+	<LandingTools tools={service.tools ?? []} />
+</Layout>

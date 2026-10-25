@@ -6,15 +6,24 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { signTelegramLogin, sqliteStore, Tokens } from '@aimuzov/infra-mcp-kit/http'
-import { connectHttp, oauthFlow, startHttp, textOf, type RunningHttp } from '@aimuzov/infra-mcp-kit/testing'
+import {
+	connectHttp,
+	devLink,
+	fakePages,
+	oauthFlow,
+	startHttp,
+	telegramSigned,
+	textOf,
+	type RunningHttp,
+} from '@aimuzov/infra-mcp-kit/testing'
 import express from 'express'
 
 import { buildCorpus } from '#thinks/corpus/build'
 import { makeDump } from '#thinks/testing/fixtures'
 
-import { createApp, listen } from './app.ts'
+import { createApp, listen, type AccountState } from './app.ts'
 import { migrateAuthDb } from './auth-db.ts'
-import { Builds, type BuildRunner } from './builds.ts'
+import { BUILD_STEPS, Builds, type BuildRunner } from './builds.ts'
 import type { ThinksHttpConfig } from './config.ts'
 import { Users } from './users.ts'
 
@@ -56,7 +65,7 @@ let http: RunningHttp
 let users: Users
 let builds: Builds
 
-function config(publicUrl: string): ThinksHttpConfig {
+function config(publicUrl: string, devUserId = ''): ThinksHttpConfig {
 	return {
 		http: { port: 0, publicUrl: new URL(publicUrl), authSecret: SECRET, allowedRedirectUris: [] },
 		telegramBotToken: BOT_TOKEN,
@@ -64,7 +73,7 @@ function config(publicUrl: string): ThinksHttpConfig {
 		dataDir,
 		maxUploadBytes: 1024 * 1024,
 		buildHeapMb: 256,
-		devUserId: '',
+		devUserId,
 	}
 }
 
@@ -84,14 +93,8 @@ function telegram(id: string, botToken = BOT_TOKEN) {
 	return signTelegramLogin({ id, first_name: 'Ivan', auth_date: String(Math.floor(Date.now() / 1000)) }, botToken)
 }
 
-/** What the widget does: append the signed login to the auth URL and follow it. */
-function widget(id: string, botToken = BOT_TOKEN) {
-	return (_page: string, callback: URL) => {
-		for (const [k, v] of Object.entries(telegram(id, botToken))) callback.searchParams.set(k, v)
-
-		return fetch(callback, { redirect: 'manual' })
-	}
-}
+/** What the widget does on the static login page: come back to the callback with a signed query. */
+const widget = (id: string, botToken = BOT_TOKEN) => telegramSigned({ id, first_name: 'Ivan' }, botToken)
 
 async function connect(userId: string) {
 	const { tokens } = await oauthFlow({ base: http.base, login: widget(userId) })
@@ -118,6 +121,29 @@ describe('OAuth', () => {
 
 		assert.ok(flow.tokens.access_token)
 		assert.equal((await flow.exchangeAgain()).status, 400)
+	})
+
+	it('пускает по dev-ссылке на localhost, когда задан THINKS_DEV_USER_ID', async () => {
+		const dev = await startHttp((base) =>
+			createApp({
+				cfg: config(base, OWNER),
+				store: sqliteStore(join(dataDir, 'dev-auth.db')),
+				users,
+				builds,
+				publicDir: fakePages(),
+			}),
+		)
+
+		try {
+			seedCorpus(OWNER)
+
+			const { tokens } = await oauthFlow({ base: dev.base, login: devLink() })
+			const client = await connectHttp(dev.base, tokens.access_token)
+
+			assert.ok(textOf(await client.callTool(brief)).includes('# ПРИМЕРЫ ИЗ АРХИВА'))
+		} finally {
+			await dev.close()
+		}
 	})
 
 	it('refuses a login signed with another bot token', async () => {
@@ -220,27 +246,98 @@ describe('account', () => {
 			body,
 		})
 
-	it('greets a logged-in user on the kit page with the page script', async () => {
-		const cookie = await sessionCookie(OWNER)
-		const page = await (await fetch(`${http.base}/account`, { headers: { cookie } })).text()
+	const accountState = async (cookie: string) => {
+		const res = await fetch(`${http.base}/account/state`, { headers: { cookie } })
 
-		assert.match(page, /Привет, Ivan/)
-		assert.match(page, /<script src="\/account\.js" defer>/)
-		assert.equal((await fetch(`${http.base}/account.js`)).status, 200)
+		assert.equal(res.status, 200)
+
+		return (await res.json()) as AccountState
+	}
+
+	it('отдаёт состояние кабинета вошедшему и 401 всем остальным', async () => {
+		const unauthorized = await fetch(`${http.base}/account/state`)
+
+		assert.equal(unauthorized.status, 401)
+		assert.equal(((await unauthorized.json()) as { error: { code: string } }).error.code, 'unauthorized')
+
+		const state = await accountState(await sessionCookie(OWNER))
+
+		assert.equal(state.name, 'Ivan')
+		assert.equal(state.hasCorpus, false)
+		assert.equal(state.status, null)
+		assert.equal(state.busy, false)
+		assert.equal(state.settings.recentYears, 3)
 	})
 
 	it('keeps the session cookie of the old server', async () => {
 		const before = new Tokens({ secret: SECRET, issuer: new URL(http.base).href })
 		const cookie = `thinks_session=${await before.sign('session', { sub: OWNER, name: 'Ivan' })}`
-		const page = await (await fetch(`${http.base}/account`, { headers: { cookie } })).text()
 
-		assert.match(page, /Привет, Ivan/)
+		assert.equal((await accountState(cookie)).name, 'Ivan')
+	})
+
+	it('отправляет на страницу ошибки, когда Telegram не подтвердил вход', async () => {
+		const url = new URL('/account/login', http.base)
+
+		for (const [k, v] of Object.entries(telegram(OWNER, '999:forged'))) url.searchParams.set(k, v)
+
+		const res = await fetch(url, { redirect: 'manual' })
+
+		assert.equal(res.status, 302)
+		assert.match(res.headers.get('location') ?? '', /^\/error\?code=login&/)
+		assert.equal(res.headers.get('set-cookie'), null)
+	})
+
+	it('подсказывает странице входа бота и выключает dev-вход вне localhost', async () => {
+		const res = await fetch(`${http.base}/account/auth`)
+
+		assert.deepEqual(await res.json(), { botName: 'thinks_test_bot', dev: null })
+	})
+
+	it('выходит из кабинета только со страницы сервиса', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const logout = (origin: string) =>
+			fetch(`${http.base}/account/logout`, { method: 'POST', headers: { cookie, origin } })
+
+		assert.equal((await logout('https://evil.example')).status, 403)
+
+		const res = await logout(http.base)
+
+		assert.equal(res.status, 200)
+		assert.match(res.headers.get('set-cookie') ?? '', /^thinks_session=;/)
+	})
+
+	it('пишет шаги сборки в статус, пока она идёт', async () => {
+		const seen: Array<number | undefined> = []
+		const watching = new Builds(users, dataDir, async (job, progress) => {
+			for (let i = 0; i < BUILD_STEPS.length; i++) {
+				progress()
+				seen.push(watching.status(job.userId)?.step)
+			}
+
+			writeFileSync(job.dbPath, '')
+
+			return null
+		})
+
+		mkdirSync(users.dir(OWNER), { recursive: true })
+		writeFileSync(watching.dumpPath(OWNER), '{}')
+		watching.enqueue(OWNER)
+		await watching.idle()
+
+		assert.deepEqual(seen, [1, 2, 3, 4, 5])
+		assert.equal(watching.status(OWNER)?.state, 'ready')
+		assert.equal(watching.status(OWNER)?.step, undefined)
 	})
 
 	it('builds a corpus from the uploaded export and deletes the export', async () => {
 		const cookie = await sessionCookie(OWNER)
 
-		assert.equal((await upload(cookie, JSON.stringify(makeDump()))).status, 202)
+		const res = await upload(cookie, JSON.stringify(makeDump()))
+
+		assert.equal(res.status, 202)
+		// Очередь пуста, и сборка берётся сразу: кабинет видит её уже идущей.
+		assert.equal(((await res.json()) as AccountState).status?.state, 'building')
 		await builds.idle()
 
 		assert.equal(builds.status(OWNER)?.state, 'ready')
@@ -326,7 +423,7 @@ describe('account', () => {
 
 		await upload(cookie, JSON.stringify(makeDump()))
 		assert.equal(builds.status(OWNER)?.state, 'queued')
-		assert.equal((await deleteAccount(cookie)).status, 302)
+		assert.equal((await deleteAccount(cookie)).status, 200)
 		release()
 		await builds.idle()
 		assert.equal(existsSync(users.dir(OWNER)), false)
@@ -335,14 +432,10 @@ describe('account', () => {
 	it('deletes everything the user has', async () => {
 		seedCorpus(OWNER)
 
-		const cookie = await sessionCookie(OWNER)
-		const res = await fetch(`${http.base}/account/delete`, {
-			method: 'POST',
-			headers: { cookie, origin: http.base },
-			redirect: 'manual',
-		})
+		const res = await deleteAccount(await sessionCookie(OWNER))
 
-		assert.equal(res.status, 302)
+		assert.equal(res.status, 200)
+		assert.match(res.headers.get('set-cookie') ?? '', /^thinks_session=;/)
 		assert.equal(users.hasCorpus(OWNER), false)
 	})
 })
@@ -373,26 +466,40 @@ describe('voice mode', () => {
 		assert.ok(text.includes('# Как я пишу'))
 	})
 
-	it('saves the switch from the account form', async () => {
+	it('saves the switch from the account settings', async () => {
 		const url = new URL('/account/login', http.base)
 
 		for (const [k, v] of Object.entries(telegram(OWNER))) url.searchParams.set(k, v)
 
 		const login = await fetch(url, { redirect: 'manual' })
 		const cookie = login.headers.get('set-cookie')?.split(';')[0] ?? ''
-		const save = (body: string) =>
+		const save = (body: Record<string, unknown>) =>
 			fetch(`${http.base}/account/settings`, {
 				method: 'POST',
-				headers: { cookie, origin: http.base, 'content-type': 'application/x-www-form-urlencoded' },
-				body,
-				redirect: 'manual',
+				headers: { cookie, origin: http.base, 'content-type': 'application/json' },
+				body: JSON.stringify(body),
 			})
+		const saved = await save({ neverMarks: '—:--', chatStopList: '', recentYears: 99, voice: true })
 
-		await save('neverMarks=&chatStopList=&recentYears=3&voice=1')
+		assert.equal(saved.status, 200)
+		assert.equal(((await saved.json()) as AccountState).settings.voice, true)
 		assert.equal(users.settings(OWNER).voice, true)
-		// An unchecked box is simply absent from the form.
-		await save('neverMarks=&chatStopList=&recentYears=3')
+		// Годы вне 1..20 сбрасываются на значение по умолчанию, а строка не становится голосом.
+		assert.equal(users.settings(OWNER).recentYears, 3)
+		await save({ neverMarks: '', chatStopList: '', recentYears: 5, voice: '1' })
 		assert.equal(users.settings(OWNER).voice, false)
+		assert.equal(users.settings(OWNER).recentYears, 5)
+
+		// Форма из вкладки, открытой до деплоя, шлёт urlencoded. Пустым телом она
+		// сбросила бы настройки к умолчаниям, поэтому сервер её отклоняет.
+		const stale = await fetch(`${http.base}/account/settings`, {
+			method: 'POST',
+			headers: { cookie, origin: http.base, 'content-type': 'application/x-www-form-urlencoded' },
+			body: 'neverMarks=&chatStopList=&recentYears=3',
+		})
+
+		assert.equal(stale.status, 415)
+		assert.equal(users.settings(OWNER).recentYears, 5)
 	})
 })
 

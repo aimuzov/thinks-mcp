@@ -1,18 +1,22 @@
-import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
+import { createWriteStream, mkdirSync } from 'node:fs'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { fileURLToPath } from 'node:url'
 import { log } from '@aimuzov/infra-mcp-kit'
 import {
+	apiError,
 	createHttpApp,
+	errorPage,
+	requireSession,
 	sameOrigin,
+	sendJson,
 	sessions,
 	sqliteStore,
 	telegramLogin,
 	telegramUser,
 	Tokens,
-	ui,
 	type AuthStore,
 	type HttpContext,
 } from '@aimuzov/infra-mcp-kit/http'
@@ -21,16 +25,33 @@ import express, { type Express } from 'express'
 import { createServer } from '#thinks/mcp/server'
 
 import { migrateAuthDb } from './auth-db.ts'
-import { Builds, childRunner } from './builds.ts'
+import { Builds, childRunner, type BuildStatus } from './builds.ts'
 import { loadThinksHttpConfig, type ThinksHttpConfig } from './config.ts'
-import { ACCOUNT_SCRIPT, accountLoginPage, accountPage, GRANTS, LANDING, SERVICE } from './pages.ts'
-import { DEFAULT_SETTINGS, Users } from './users.ts'
+import { DEFAULT_SETTINGS, Users, type UserSettings } from './users.ts'
+
+export const SERVICE = { name: 'thinks' }
+
+/** Страницы, которые собрал Astro: рядом со сборкой сервера, и в build/, и из исходников. */
+export const PUBLIC_DIR = fileURLToPath(new URL('../../build/public', import.meta.url))
 
 export type AppDeps = {
 	cfg: ThinksHttpConfig
 	store: AuthStore
 	users: Users
 	builds: Builds
+	/** Каталог со страницами Astro. По умолчанию PUBLIC_DIR, тестам хватает заглушек кита. */
+	publicDir?: string
+}
+
+/** Что кабинет получает от `GET /account/state`. */
+export type AccountState = {
+	name: string
+	hasCorpus: boolean
+	status: BuildStatus | null
+	settings: UserSettings
+	maxUploadBytes: number
+	/** Загрузку или сборку уже не остановить, и удалить аккаунт пока нельзя. */
+	busy: boolean
 }
 
 /**
@@ -39,21 +60,20 @@ export type AppDeps = {
  */
 const SESSION_COOKIE = 'thinks_session'
 
-const accountScript = readFileSync(new URL('./assets/account.js', import.meta.url), 'utf8')
-
-export function createApp({ cfg, store, users, builds }: AppDeps): Express {
+export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }: AppDeps): Express {
 	const { http } = cfg
-	const telegram = { botToken: cfg.telegramBotToken, botName: cfg.telegramBotName, devUserId: cfg.devUserId }
+	const telegram = { botToken: cfg.telegramBotToken, devUserId: cfg.devUserId }
 	// Shared with the account cookie, so it is built here, not by the kit.
 	const tokens = new Tokens({ secret: http.authSecret, issuer: http.publicUrl.href })
 
 	const { app } = createHttpApp({
 		config: http,
 		service: SERVICE,
+		publicDir,
 		auth: {
 			store,
 			tokens,
-			login: telegramLogin({ ...telegram, grants: GRANTS }),
+			login: telegramLogin(telegram),
 		},
 		// The user id only ever comes from a verified token,
 		// and Users checks it once more.
@@ -62,8 +82,7 @@ export function createApp({ cfg, store, users, builds }: AppDeps): Express {
 
 			return createServer(users.config(userId), users.corpus(userId))
 		},
-		landing: LANDING,
-		routes: (app, context) => mountAccount(app, context, { cfg, users, builds, telegram }),
+		routes: (app, context) => mountAccount(app, context, { cfg, users, builds }),
 	})
 
 	return app
@@ -73,48 +92,48 @@ type AccountDeps = {
 	cfg: ThinksHttpConfig
 	users: Users
 	builds: Builds
-	telegram: { botToken: string; botName: string; devUserId: string }
 }
 
-function mountAccount(app: Express, { tokens, mcpUrl }: HttpContext, { cfg, users, builds, telegram }: AccountDeps) {
+function mountAccount(app: Express, { tokens }: HttpContext, { cfg, users, builds }: AccountDeps) {
 	const { publicUrl } = cfg.http
 	const session = sessions(tokens, publicUrl, SESSION_COOKIE)
+	const signedIn = requireSession(session)
 	const origin = sameOrigin(publicUrl)
-	const fail = (res: express.Response, title: string, status = 400) =>
-		res
-			.status(status)
-			.type('html')
-			.send(ui.failPage({ service: SERVICE, title, href: '/account', hrefLabel: 'В кабинет' }))
+	const userOf = (res: express.Response) => String(res.locals.session.sub)
 
-	const user = async (req: express.Request) => {
-		const claims = await session.read(req)
+	const state = (userId: string, name: string): AccountState => {
+		const status = builds.status(userId)
 
-		return claims && { id: claims.sub, name: String(claims.name ?? '') }
+		return {
+			name: name || userId,
+			hasCorpus: users.hasCorpus(userId),
+			status,
+			settings: users.settings(userId),
+			maxUploadBytes: cfg.maxUploadBytes,
+			busy: !builds.canDelete(userId),
+		}
 	}
 
-	app.get(ACCOUNT_SCRIPT, (_req, res) => void res.type('text/javascript').send(accountScript))
-
-	app.get('/account', async (req, res) => {
-		const me = await user(req)
-
-		if (!me) return void res.type('html').send(accountLoginPage(new URL('/account/login', publicUrl), telegram))
-
-		res.type('html').send(
-			accountPage({
-				name: me.name || me.id,
-				mcpUrl: mcpUrl.href,
-				hasCorpus: users.hasCorpus(me.id),
-				status: builds.status(me.id),
-				settings: users.settings(me.id),
-				maxUploadBytes: cfg.maxUploadBytes,
-			}),
-		)
+	app.get('/account/state', signedIn, (_req, res) => {
+		sendJson(res, state(userOf(res), String(res.locals.session.name ?? '')))
 	})
 
-	app.get('/account/login', async (req, res) => {
-		const login = telegramUser(req, telegram)
+	// Страница входа статична и не знает, как запущен сервер: на localhost
+	// у неё вместо виджета dev-ссылка, а имя бота -- то, которым сервер проверяет подпись.
+	app.get('/account/auth', (_req, res) => {
+		sendJson(res, { botName: cfg.telegramBotName, dev: cfg.devUserId || null })
+	})
 
-		if (!login) return void fail(res, 'Telegram не подтвердил вход')
+	// Сюда виджет Telegram возвращает человека с подписанным query.
+	app.get('/account/login', async (req, res) => {
+		const login = telegramUser(req, { botToken: cfg.telegramBotToken, devUserId: cfg.devUserId })
+
+		if (!login) {
+			return void res.redirect(
+				302,
+				errorPage({ code: 'login', title: 'Telegram не подтвердил вход', message: 'Попробуй войти ещё раз.' }),
+			)
+		}
 
 		await session.write(res, { sub: login.id, name: login.firstName || login.username })
 		res.redirect(302, '/account')
@@ -122,67 +141,69 @@ function mountAccount(app: Express, { tokens, mcpUrl }: HttpContext, { cfg, user
 
 	app.post('/account/logout', origin, (_req, res) => {
 		session.clear(res)
-		res.redirect(302, '/account')
+		sendJson(res, { ok: true })
 	})
 
-	app.put('/account/upload', origin, async (req, res) => {
-		const me = await user(req)
-
-		if (!me) return void res.status(401).send('Войди заново')
+	app.put('/account/upload', origin, signedIn, async (req, res) => {
+		const userId = userOf(res)
 
 		if (Number(req.get('content-length')) > cfg.maxUploadBytes) {
-			return void res.status(413).send('Файл больше допустимого')
+			return void apiError(res, 413, 'too_large', 'Файл больше допустимого')
 		}
 
 		// Две загрузки одного пользователя писали бы в один и тот же файл.
-		if (!builds.beginUpload(me.id)) {
-			return void res.status(409).send('Предыдущая загрузка или сборка ещё не закончилась')
+		if (!builds.beginUpload(userId)) {
+			return void apiError(res, 409, 'busy', 'Предыдущая загрузка или сборка ещё не закончилась')
 		}
 
 		try {
-			mkdirSync(users.dir(me.id), { recursive: true })
-			await pipeline(req, sizeLimit(cfg.maxUploadBytes), createWriteStream(builds.dumpPath(me.id)))
+			mkdirSync(users.dir(userId), { recursive: true })
+			await pipeline(req, sizeLimit(cfg.maxUploadBytes), createWriteStream(builds.dumpPath(userId)))
 		} catch (err) {
-			builds.discardUpload(me.id)
+			builds.discardUpload(userId)
 
-			return void uploadFailed(res, err, me.id)
+			return void uploadFailed(res, err, userId)
 		} finally {
-			builds.endUpload(me.id)
+			builds.endUpload(userId)
 		}
 
-		builds.enqueue(me.id)
-		res.status(202).send('Сборка поставлена в очередь')
+		builds.enqueue(userId)
+		sendJson(res, state(userId, String(res.locals.session.name ?? '')), 202)
 	})
 
-	app.post('/account/settings', origin, express.urlencoded({ extended: false, limit: '16kb' }), async (req, res) => {
-		const me = await user(req)
+	app.post('/account/settings', origin, signedIn, express.json({ limit: '16kb' }), (req, res) => {
+		// Старая форма кабинета слала urlencoded, и вкладка, открытая до деплоя, пришла бы
+		// с пустым для express.json телом: настройки сбросились бы к умолчаниям.
+		if (!req.is('application/json')) {
+			return void apiError(res, 415, 'json_only', 'Обнови страницу кабинета и сохрани ещё раз')
+		}
 
-		if (!me) return void res.redirect(302, '/account')
+		const userId = userOf(res)
+		const body = (req.body ?? {}) as Record<string, unknown>
+		const years = Number.parseInt(String(body.recentYears ?? ''), 10)
 
-		const years = Number.parseInt(String(req.body.recentYears ?? ''), 10)
-
-		users.saveSettings(me.id, {
-			neverMarks: String(req.body.neverMarks ?? '').trim(),
-			chatStopList: String(req.body.chatStopList ?? '').trim(),
+		users.saveSettings(userId, {
+			neverMarks: String(body.neverMarks ?? '').trim(),
+			chatStopList: String(body.chatStopList ?? '').trim(),
 			recentYears: years >= 1 && years <= 20 ? years : DEFAULT_SETTINGS.recentYears,
-			voice: req.body.voice === '1',
+			voice: body.voice === true,
 		})
 
-		res.redirect(302, '/account')
+		sendJson(res, state(userId, String(res.locals.session.name ?? '')))
 	})
 
-	app.post('/account/delete', origin, async (req, res) => {
-		const me = await user(req)
-
-		if (!me) return void res.redirect(302, '/account')
+	app.post('/account/delete', origin, signedIn, (_req, res) => {
+		const userId = userOf(res)
 
 		// Идущую сборку не остановить, а её статус и корпус легли бы в уже
 		// удалённый каталог.
-		if (!builds.cancel(me.id)) return void fail(res, 'Дождись конца сборки, потом удаляй аккаунт', 409)
+		if (!builds.cancel(userId)) {
+			return void apiError(res, 409, 'busy', 'Дождись конца сборки, потом удаляй аккаунт')
+		}
 
-		users.remove(me.id)
+		users.remove(userId)
 		session.clear(res)
-		res.redirect(302, '/')
+		sendJson(res, { ok: true })
 	})
 }
 
@@ -204,23 +225,17 @@ function sizeLimit(max: number): Transform {
 
 /** Only an oversized file is the user's fault; a full disk is ours. */
 function uploadFailed(res: express.Response, err: unknown, userId: string): void {
-	if (err instanceof TooLarge) {
-		res.status(413).send('Файл больше допустимого')
-
-		return
-	}
+	if (err instanceof TooLarge) return apiError(res, 413, 'too_large', 'Файл больше допустимого')
 
 	const code = (err as NodeJS.ErrnoException).code
 
 	// Клиент оборвал загрузку: ответ до него уже не дойдёт, и это не сбой сервера.
 	if (code === 'ECONNRESET' || code === 'ERR_STREAM_PREMATURE_CLOSE') {
-		res.status(400).send('Загрузка оборвалась')
-
-		return
+		return apiError(res, 400, 'aborted', 'Загрузка оборвалась')
 	}
 
 	log.error(`Не удалось сохранить загрузку ${userId}`, { error: String(err) })
-	res.status(500).send('Не удалось сохранить файл, попробуй позже')
+	apiError(res, 500, 'upload_failed', 'Не удалось сохранить файл, попробуй позже')
 }
 
 /** Run the hosted server. Configured entirely from the environment. */

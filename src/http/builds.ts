@@ -12,7 +12,22 @@ export type BuildStatus = {
 	state: BuildState
 	message: string
 	updatedAt: number
+	/** Пройденный шаг сборки из BUILD_STEPS, пока state -- building. */
+	step?: number
+	steps?: number
 }
+
+/**
+ * Шаги сборки, как о них отчитывается buildCorpus: по строке лога на каждый. Тексты свои, а не
+ * из лога: там путь к выгрузке на сервере и числа, которые человеку ни о чём не скажут.
+ */
+export const BUILD_STEPS = [
+	'Читаю выгрузку',
+	'Нашёл владельца архива',
+	'Собираю реплики',
+	'Записываю индексы поиска',
+	'Считаю стиль-профиль',
+]
 
 export type BuildJob = {
 	dataDir: string
@@ -21,8 +36,11 @@ export type BuildJob = {
 	dbPath: string
 }
 
-/** Runs one build; resolves with the error text, or null on success. */
-export type BuildRunner = (job: BuildJob) => Promise<string | null>
+/**
+ * Runs one build; resolves with the error text, or null on success. `progress` is called once
+ * per step the build reports.
+ */
+export type BuildRunner = (job: BuildJob, progress: () => void) => Promise<string | null>
 
 // From the sources the worker is a .ts file, and it needs the same
 // `--conditions` to resolve `#thinks/*`.
@@ -32,7 +50,7 @@ const CONDITIONS = process.execArgv.filter((arg) => arg.startsWith('--conditions
 
 /** The default runner: the worker in a child process with a capped heap. */
 export function childRunner(heapMb: number): BuildRunner {
-	return (job) =>
+	return (job, progress) =>
 		new Promise((resolve) => {
 			const child = spawn(
 				process.execPath,
@@ -45,7 +63,7 @@ export function childRunner(heapMb: number): BuildRunner {
 					job.dumpPath,
 					job.dbPath,
 				],
-				{ stdio: ['ignore', 'ignore', 'pipe'] },
+				{ stdio: ['ignore', 'pipe', 'pipe'] },
 			)
 			let stderr = ''
 			let settled = false
@@ -55,6 +73,13 @@ export function childRunner(heapMb: number): BuildRunner {
 				settled = true
 				resolve(error)
 			}
+
+			// Воркер пишет в stdout по строке на пройденный шаг, больше там ничего нет.
+			child.stdout.setEncoding('utf8')
+
+			child.stdout.on('data', (chunk: string) => {
+				for (const char of chunk) if (char === '\n') progress()
+			})
 
 			child.stderr.setEncoding('utf8')
 
@@ -66,7 +91,7 @@ export function childRunner(heapMb: number): BuildRunner {
 			// exception, и падает весь сервер вместе с чужими сессиями.
 			child.on('error', (err) => {
 				log.error(`Не удалось запустить сборку ${job.userId}`, { error: err.message })
-				done(`Не удалось запустить сборку: ${err.message}`)
+				done(`Не удалось запустить сборку: ${err.message}`)
 			})
 
 			child.on('close', (code, signal) => {
@@ -87,13 +112,13 @@ export function exitMessage(code: number | null, signal: string | null, stderr: 
 	if (/heap out of memory|Reached heap limit/i.test(stderr)) return 'Сборке не хватило памяти'
 
 	// SIGKILL без текста в stderr чаще всего от OOM killer ядра.
-	if (signal === 'SIGKILL') return 'Сборку остановила система, скорее всего не хватило памяти'
+	if (signal === 'SIGKILL') return 'Сборку остановила система, скорее всего не хватило памяти'
 
 	if (signal) return `Сборка прервана сигналом ${signal}`
 
 	const lines = stderr.trim().split('\n')
 
-	return lines[lines.length - 1] || `Сборка завершилась с кодом ${code}`
+	return lines[lines.length - 1] || `Сборка завершилась с кодом ${code}`
 }
 
 /**
@@ -160,6 +185,11 @@ export class Builds {
 		return true
 	}
 
+	/** Можно ли сейчас удалить данные пользователя: то же условие, что у cancel, но без побочных эффектов. */
+	canDelete(userId: string): boolean {
+		return this.current !== userId && !this.uploads.has(userId)
+	}
+
 	status(userId: string): BuildStatus | null {
 		const path = this.statusPath(userId)
 
@@ -173,7 +203,7 @@ export class Builds {
 		if (this.queue.includes(userId)) return
 
 		this.queue.push(userId)
-		this.setStatus(userId, 'queued', 'В очереди')
+		this.setStatus(userId, 'queued', 'В очереди')
 		this.kick()
 	}
 
@@ -229,16 +259,18 @@ export class Builds {
 		const target = this.users.config(userId).dbPath
 		const tmp = `${target}.building`
 
-		this.setStatus(userId, 'building', 'Собираю корпус')
+		let step = 0
+		const progress = () => {
+			step = Math.min(step + 1, BUILD_STEPS.length)
+			this.setStatus(userId, 'building', BUILD_STEPS[step - 1] ?? 'Собираю корпус', step)
+		}
+
+		this.setStatus(userId, 'building', 'Собираю корпус', 0)
 		removeDb(tmp)
 
 		try {
-			const error = await this.run({
-				dataDir: this.dataDir,
-				userId,
-				dumpPath: this.dumpPath(userId),
-				dbPath: tmp,
-			})
+			const job = { dataDir: this.dataDir, userId, dumpPath: this.dumpPath(userId), dbPath: tmp }
+			const error = await this.run(job, progress)
 
 			if (error) return this.setStatus(userId, 'failed', error)
 
@@ -256,8 +288,10 @@ export class Builds {
 		return join(this.users.dir(userId), 'build.json')
 	}
 
-	private setStatus(userId: string, state: BuildState, message: string): void {
+	private setStatus(userId: string, state: BuildState, message: string, step?: number): void {
 		const status: BuildStatus = { state, message, updatedAt: Date.now() }
+
+		if (step !== undefined) Object.assign(status, { step, steps: BUILD_STEPS.length })
 
 		try {
 			writeFileSync(this.statusPath(userId), JSON.stringify(status))

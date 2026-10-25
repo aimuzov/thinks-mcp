@@ -4,8 +4,11 @@ FROM node:26.11.1-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY tsconfig.json tsconfig.build.json ./
+COPY tsconfig.json tsconfig.node.json tsconfig.build.json astro.config.mjs svelte.config.js postcss.config.mjs ./
 COPY src ./src
+# Страницы собирает Astro в build/public. Имя бота для входа клиента вшивается в них
+# здесь: окружение прода на сборку не попадает, по умолчанию берётся боевой бот.
+ARG TELEGRAM_BOT_NAME
 RUN npm run build && npm prune --omit=dev
 
 FROM node:26.11.1-alpine

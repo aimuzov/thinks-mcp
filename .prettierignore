@@ -7,3 +7,5 @@ CHANGELOG.md
 .release-please-manifest.json
 data
 dump.json
+.astro
+test-results

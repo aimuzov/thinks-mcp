@@ -1,17 +1,12 @@
 {
+	// Страницы и острова: этот конфиг читают astro check и svelte-check. Сервер, тесты
+	// и e2e проверяет tsc по tsconfig.node.json.
+	"extends": "astro/tsconfigs/strict",
 	"compilerOptions": {
-		"target": "esnext",
-		"module": "nodenext",
-		"moduleResolution": "nodenext",
-		"types": ["node"],
-		"strict": true,
-		"noEmit": true,
-		"allowImportingTsExtensions": true,
-		"erasableSyntaxOnly": true,
-		"verbatimModuleSyntax": true,
-		"resolveJsonModule": true,
-		"skipLibCheck": true,
-		"customConditions": ["thinks-source"]
+		// Острова берут типы API из сервера: `#thinks/*` ведёт в исходники по этому условию.
+		"customConditions": ["thinks-source"],
+		"types": ["node"]
 	},
-	"include": ["src"]
+	"include": [".astro/types.d.ts", "src/frontend", "astro.config.mjs"],
+	"exclude": ["build"]
 }

@@ -50,8 +50,8 @@
 	},
 	"scripts": {
 		"start": "node --conditions=thinks-source src/index.ts",
-		"build": "rm -rf build && tsc -p tsconfig.build.json && cp -R src/http/assets build/http/ && chmod +x build/index.js",
-		"typecheck": "tsc",
+		"build": "rm -rf build && tsc -p tsconfig.build.json && astro build && chmod +x build/index.js",
+		"typecheck": "tsc -p tsconfig.node.json",
 		"test": "node --conditions=thinks-source --test 'src/**/*.test.ts'",
 		"format": "oxlint --fix && prettier --write .",
 		"format:check": "prettier --check .",
@@ -59,26 +59,36 @@
 		"corpus": "node --conditions=thinks-source --max-old-space-size=8192 src/index.ts build",
 		"profile": "node --conditions=thinks-source src/index.ts profile",
 		"where": "node --conditions=thinks-source src/index.ts where",
-		"prepack": "npm run build"
+		"prepack": "npm run build",
+		"test:ui": "npm run build && node --conditions=thinks-source --test e2e/*.e2e.ts"
 	},
 	"dependencies": {
-		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v1.0.2",
+		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v2.0.0",
 		"@modelcontextprotocol/sdk": "1.32.1",
 		"express": "5.2.1",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
-		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v4.0.0",
+		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v4.1.0",
+		"@astrojs/check": "0.9.10",
+		"@astrojs/svelte": "9.0.1",
+		"@lucide/svelte": "1.39.0",
 		"@types/express": "5.0.6",
 		"@types/node": "26.6.5",
+		"astro": "7.3.7",
 		"oxlint": "1.87.0",
+		"playwright": "1.64.0",
+		"postcss-nested": "8.0.1",
 		"prettier": "3.9.9",
+		"svelte": "5.57.2",
+		"svelte-check": "4.7.6",
 		"typescript": "6.0.3"
 	},
 	"imports": {
 		"#thinks/*": {
 			"thinks-source": "./src/*.ts",
 			"default": "./build/*.js"
-		}
+		},
+		"#frontend/*": "./src/frontend/*"
 	}
 }
