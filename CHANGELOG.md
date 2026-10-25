@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.1](https://github.com/aimuzov/thinks-mcp/compare/v0.8.0...v0.8.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* revoke tokens on account delete and keep the account gone ([dac8295](https://github.com/aimuzov/thinks-mcp/commit/dac82951bccaef79d45048bb78ab4585c77359c2))
+* revoke tokens on account delete and keep the account gone ([2bffe17](https://github.com/aimuzov/thinks-mcp/commit/2bffe1708d178540bd63feb6bada7028cff998e2))
+
 ## [0.8.0](https://github.com/aimuzov/thinks-mcp/compare/v0.7.0...v0.8.0) (2026-10-25)
 
 
