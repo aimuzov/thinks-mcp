@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.1](https://github.com/aimuzov/thinks-mcp/compare/v0.6.0...v0.6.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 1.0.2 so a bad token gets 401 ([2169009](https://github.com/aimuzov/thinks-mcp/commit/2169009f12255f34c856eebea54a44a1be9eb585))
+* **deps:** move to infra-mcp-kit 1.0.2 so a bad token gets 401 ([fdef25a](https://github.com/aimuzov/thinks-mcp/commit/fdef25a9f89bff1aecc488ae4529845538ca556c))
+
 ## [0.6.0](https://github.com/aimuzov/thinks-mcp/compare/v0.5.0...v0.6.0) (2026-10-25)
 
 
