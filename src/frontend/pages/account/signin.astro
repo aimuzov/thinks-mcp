@@ -1,0 +1,13 @@
+---
+import Layout from '@aimuzov/infra-mcp-kit/astro/layout.astro'
+
+import Signin from '#frontend/components/signin.svelte'
+
+// Виджет Telegram нужен только здесь, поэтому и его источники пускаем только на этой странице.
+Astro.csp?.insertScriptResource('https://telegram.org')
+Astro.csp?.insertDirective('frame-src https://oauth.telegram.org')
+---
+
+<Layout title="Вход в кабинет thinks" screen="consent">
+	<Signin client:load />
+</Layout>

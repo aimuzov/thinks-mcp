@@ -19,3 +19,7 @@ dump.json
 
 # Serena (LSP assistant) project cache
 .serena/
+
+# Astro: типы и скриншоты e2e.
+.astro/
+test-results/

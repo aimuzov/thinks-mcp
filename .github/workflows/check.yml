@@ -14,9 +14,27 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: aimuzov/infra-mcp-kit/check@v1
+      - uses: aimuzov/infra-mcp-kit/check@v2
         # Образ собирается и на сервере, но лучше, чтобы он сломался здесь.
         with:
           docker: deploy/Dockerfile
+      # Кабинет и вход в настоящем Chromium на собранной статике: CSP режет инлайн-код
+      # молча, это видно только в консоли браузера. Браузер кэшируется по версии
+      # Playwright, системные библиотеки ставятся из apt каждый прогон.
+      # Снимки не сравниваем: шрифты на раннере другие, они уходят артефактом.
+      - id: playwright
+        run: echo "version=$(npm ls playwright --json | jq -r '.dependencies.playwright.version')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: test-results/screens
+          if-no-files-found: ignore

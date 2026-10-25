@@ -9,3 +9,6 @@ dump.json
 .env
 **/*.test.ts
 src/testing
+e2e
+test-results
+.astro
