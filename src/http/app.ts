@@ -80,9 +80,9 @@ function mountAccount(app: Express, { tokens, mcpUrl }: HttpContext, { cfg, user
 	const { publicUrl } = cfg.http
 	const session = sessions(tokens, publicUrl, SESSION_COOKIE)
 	const origin = sameOrigin(publicUrl)
-	const fail = (res: express.Response, title: string) =>
+	const fail = (res: express.Response, title: string, status = 400) =>
 		res
-			.status(400)
+			.status(status)
 			.type('html')
 			.send(ui.failPage({ service: SERVICE, title, href: '/account', hrefLabel: 'В кабинет' }))
 
@@ -134,20 +134,20 @@ function mountAccount(app: Express, { tokens, mcpUrl }: HttpContext, { cfg, user
 			return void res.status(413).send('Файл больше допустимого')
 		}
 
-		const state = builds.status(me.id)?.state
-
-		if (state === 'queued' || state === 'building') {
-			return void res.status(409).send('Предыдущая сборка ещё не закончилась')
+		// Две загрузки одного пользователя писали бы в один и тот же файл.
+		if (!builds.beginUpload(me.id)) {
+			return void res.status(409).send('Предыдущая загрузка или сборка ещё не закончилась')
 		}
 
-		mkdirSync(users.dir(me.id), { recursive: true })
-
 		try {
+			mkdirSync(users.dir(me.id), { recursive: true })
 			await pipeline(req, sizeLimit(cfg.maxUploadBytes), createWriteStream(builds.dumpPath(me.id)))
-		} catch {
+		} catch (err) {
 			builds.discardUpload(me.id)
 
-			return void res.status(413).send('Загрузка оборвалась или файл слишком большой')
+			return void uploadFailed(res, err, me.id)
+		} finally {
+			builds.endUpload(me.id)
 		}
 
 		builds.enqueue(me.id)
@@ -176,11 +176,17 @@ function mountAccount(app: Express, { tokens, mcpUrl }: HttpContext, { cfg, user
 
 		if (!me) return void res.redirect(302, '/account')
 
+		// Идущую сборку не остановить, а её статус и корпус легли бы в уже
+		// удалённый каталог.
+		if (!builds.cancel(me.id)) return void fail(res, 'Дождись конца сборки, потом удаляй аккаунт', 409)
+
 		users.remove(me.id)
 		session.clear(res)
 		res.redirect(302, '/')
 	})
 }
+
+class TooLarge extends Error {}
 
 /** Fail the stream once more than `max` bytes have gone through. */
 function sizeLimit(max: number): Transform {
@@ -190,10 +196,31 @@ function sizeLimit(max: number): Transform {
 		transform(chunk: Buffer, _enc, done) {
 			seen += chunk.length
 
-			if (seen > max) done(new Error('too large'))
+			if (seen > max) done(new TooLarge('too large'))
 			else done(null, chunk)
 		},
 	})
+}
+
+/** Only an oversized file is the user's fault; a full disk is ours. */
+function uploadFailed(res: express.Response, err: unknown, userId: string): void {
+	if (err instanceof TooLarge) {
+		res.status(413).send('Файл больше допустимого')
+
+		return
+	}
+
+	const code = (err as NodeJS.ErrnoException).code
+
+	// Клиент оборвал загрузку: ответ до него уже не дойдёт, и это не сбой сервера.
+	if (code === 'ECONNRESET' || code === 'ERR_STREAM_PREMATURE_CLOSE') {
+		res.status(400).send('Загрузка оборвалась')
+
+		return
+	}
+
+	log.error(`Не удалось сохранить загрузку ${userId}`, { error: String(err) })
+	res.status(500).send('Не удалось сохранить файл, попробуй позже')
 }
 
 /** Run the hosted server. Configured entirely from the environment. */
