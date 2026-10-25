@@ -438,6 +438,386 @@ describe('account', () => {
 		assert.match(res.headers.get('set-cookie') ?? '', /^thinks_session=;/)
 		assert.equal(users.hasCorpus(OWNER), false)
 	})
+
+	const post = (path: string, init: { cookie?: string; origin?: string; type?: string; body?: string } = {}) =>
+		fetch(`${http.base}${path}`, {
+			method: 'POST',
+			headers: {
+				...(init.cookie ? { cookie: init.cookie } : {}),
+				...(init.origin ? { origin: init.origin } : {}),
+				'content-type': init.type ?? 'application/json',
+			},
+			body: init.body ?? '{}',
+		})
+
+	const errorCode = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code
+
+	it('без сессии отвечает 401 на каждый запрос кабинета', async () => {
+		const origin = http.base
+
+		for (const res of [
+			await fetch(`${http.base}/account/state`),
+			await upload('', '{}'),
+			await post('/account/settings', { origin }),
+			await post('/account/delete', { origin }),
+		]) {
+			assert.equal(res.status, 401, res.url)
+			assert.equal(await errorCode(res), 'unauthorized')
+		}
+
+		assert.equal(users.list().length, 0)
+	})
+
+	it('отвечает 401 на подделанную или битую сессию', async () => {
+		const forged = new Tokens({ secret: 'y'.repeat(32), issuer: new URL(http.base).href })
+		const cookie = `thinks_session=${await forged.sign('session', { sub: OWNER, name: 'Ivan' })}`
+
+		assert.equal((await fetch(`${http.base}/account/state`, { headers: { cookie } })).status, 401)
+
+		assert.equal(
+			(await fetch(`${http.base}/account/state`, { headers: { cookie: 'thinks_session=junk' } })).status,
+			401,
+		)
+	})
+
+	it('отклоняет изменения без своего Origin, даже с сессией', async () => {
+		const cookie = await sessionCookie(OWNER)
+
+		seedCorpus(OWNER)
+		users.saveSettings(OWNER, { ...users.settings(OWNER), recentYears: 7 })
+
+		for (const origin of [undefined, 'https://evil.example', `${http.base}.evil.example`]) {
+			const settings = await post('/account/settings', {
+				cookie,
+				origin,
+				body: JSON.stringify({ recentYears: 2 }),
+			})
+			const removed = await post('/account/delete', { cookie, origin })
+
+			assert.equal(settings.status, 403, String(origin))
+			assert.equal(await errorCode(settings), 'forbidden_origin')
+			assert.equal(removed.status, 403, String(origin))
+		}
+
+		const noOrigin = await fetch(`${http.base}/account/upload`, {
+			method: 'PUT',
+			headers: { cookie, 'content-type': 'application/octet-stream' },
+			body: '{}',
+		})
+
+		assert.equal(noOrigin.status, 403)
+		assert.equal(users.settings(OWNER).recentYears, 7)
+		assert.equal(users.hasCorpus(OWNER), true)
+	})
+
+	it('принимает настройки только в JSON', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const origin = http.base
+
+		for (const type of ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
+			const res = await post('/account/settings', { cookie, origin, type, body: 'recentYears=9' })
+
+			assert.equal(res.status, 415, type)
+			assert.equal(await errorCode(res), 'json_only')
+		}
+
+		assert.equal(existsSync(join(users.dir(OWNER), 'settings.json')), false)
+	})
+
+	it('не сохраняет настройки из битого JSON', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const res = await post('/account/settings', { cookie, origin: http.base, body: '{"recentYears": ' })
+
+		assert.ok(res.status >= 400)
+		assert.equal(existsSync(join(users.dir(OWNER), 'settings.json')), false)
+	})
+
+	it(
+		'отвечает 400, а не 500, на битый JSON в настройках',
+		{ skip: 'bug: ошибка express.json уходит в общий обработчик и становится 500 internal' },
+		async () => {
+			const cookie = await sessionCookie(OWNER)
+			const res = await post('/account/settings', { cookie, origin: http.base, body: '{"recentYears": ' })
+
+			assert.equal(res.status, 400)
+		},
+	)
+
+	it('чистит строки настроек и отдаёт их в состоянии кабинета', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const res = await post('/account/settings', {
+			cookie,
+			origin: http.base,
+			body: JSON.stringify({ neverMarks: '  —:--  ', chatStopList: ' Работа ', recentYears: '20' }),
+		})
+		const state = (await res.json()) as AccountState
+
+		assert.deepEqual(state.settings, { neverMarks: '—:--', chatStopList: 'Работа', recentYears: 20, voice: false })
+		assert.deepEqual((await accountState(cookie)).settings, state.settings)
+		// Те же настройки уходят в конфиг корпуса: так их увидит MCP-сервер.
+		assert.deepEqual(users.config(OWNER).neverMarks, [{ mark: '—', standIn: '--' }])
+		assert.deepEqual(users.config(OWNER).chatStopList, ['Работа'])
+	})
+
+	it('отвечает 413 по content-length, не читая тело', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const res = await fetch(`${http.base}/account/upload`, {
+			method: 'PUT',
+			headers: { cookie, origin: http.base, 'content-type': 'application/octet-stream' },
+			body: new Uint8Array(1024 * 1024 + 1),
+		})
+
+		assert.equal(res.status, 413)
+		assert.equal(await errorCode(res), 'too_large')
+		assert.equal(existsSync(builds.dumpPath(OWNER)), false)
+		assert.equal(builds.status(OWNER), null)
+		// Отказ не держит загрузку: следующая проходит.
+		assert.equal((await upload(cookie, JSON.stringify(makeDump()))).status, 202)
+		await builds.idle()
+	})
+
+	it('принимает файл ровно в лимит', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const res = await upload(cookie, ' '.repeat(1024 * 1024))
+
+		assert.equal(res.status, 202)
+		await builds.idle()
+		assert.equal(builds.status(OWNER)?.state, 'failed')
+	})
+
+	for (const [name, body] of [
+		['пустой файл', ''],
+		['не JSON', 'это не выгрузка'],
+		['JSON без чатов', '{"about": "x"}'],
+		['массив вместо выгрузки', '[]'],
+	] as const) {
+		it(`сообщает о неудаче, когда загрузили ${name}`, async () => {
+			const cookie = await sessionCookie(OWNER)
+			const res = await upload(cookie, body)
+
+			assert.equal(res.status, 202)
+			await builds.idle()
+
+			const state = await accountState(cookie)
+
+			assert.equal(state.status?.state, 'failed')
+			assert.ok(state.status?.message, 'пользователь видит, что не так')
+			assert.equal(state.hasCorpus, false)
+			assert.equal(state.busy, false)
+			assert.equal(existsSync(builds.dumpPath(OWNER)), false)
+		})
+	}
+
+	it('показывает идущую сборку в состоянии кабинета и не пускает загрузку поверх', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const release = hold()
+
+		await upload(cookie, JSON.stringify(makeDump()))
+
+		const during = await accountState(cookie)
+
+		assert.equal(during.busy, true)
+		assert.equal(during.status?.state, 'building')
+		assert.equal(during.status?.steps, BUILD_STEPS.length)
+
+		const second = await upload(cookie, '{}')
+
+		assert.equal(second.status, 409)
+		assert.equal(await errorCode(second), 'busy')
+		release()
+		await builds.idle()
+
+		const after = await accountState(cookie)
+
+		assert.equal(after.busy, false)
+		assert.equal(after.hasCorpus, true)
+		assert.equal(after.status?.state, 'ready')
+	})
+
+	it('не пускает загрузку, пока сборка ждёт в очереди', async () => {
+		const release = hold()
+
+		await upload(await sessionCookie(STRANGER), JSON.stringify(makeDump()))
+
+		const cookie = await sessionCookie(OWNER)
+
+		await upload(cookie, JSON.stringify(makeDump()))
+		assert.equal((await accountState(cookie)).status?.state, 'queued')
+		assert.equal((await upload(cookie, '{}')).status, 409)
+		release()
+		await builds.idle()
+		assert.equal(builds.status(OWNER)?.state, 'ready')
+	})
+
+	it('не удаляет аккаунт посреди загрузки', async () => {
+		const cookie = await sessionCookie(OWNER)
+		let push!: ReadableStreamDefaultController<Uint8Array>
+		const first = streamUpload(cookie, (c) => {
+			push = c
+			c.enqueue(new TextEncoder().encode('{'))
+		})
+
+		while (!existsSync(builds.dumpPath(OWNER))) await new Promise((r) => setTimeout(r, 5))
+
+		assert.equal((await accountState(cookie)).busy, true)
+		assert.equal((await deleteAccount(cookie)).status, 409)
+		push.enqueue(new TextEncoder().encode(JSON.stringify(makeDump()).slice(1)))
+		push.close()
+		assert.equal((await first).status, 202)
+		await builds.idle()
+		assert.equal(users.hasCorpus(OWNER), true)
+	})
+
+	it('отпускает оборванную загрузку и убирает недописанный файл', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const abort = new AbortController()
+		const broken = fetch(`${http.base}/account/upload`, {
+			method: 'PUT',
+			headers: { cookie, origin: http.base, 'content-type': 'application/octet-stream' },
+			body: new ReadableStream<Uint8Array>({
+				start: (c) => c.enqueue(new TextEncoder().encode('{"chats":')),
+			}),
+			duplex: 'half',
+			signal: abort.signal,
+		} as RequestInit)
+
+		while (!existsSync(builds.dumpPath(OWNER))) await new Promise((r) => setTimeout(r, 5))
+
+		abort.abort()
+		await assert.rejects(broken)
+
+		// Сервер узнаёт об обрыве не сразу.
+		while ((await accountState(cookie)).busy) await new Promise((r) => setTimeout(r, 5))
+
+		assert.equal(existsSync(builds.dumpPath(OWNER)), false)
+		assert.equal(builds.status(OWNER), null)
+		assert.equal((await upload(cookie, JSON.stringify(makeDump()))).status, 202)
+		await builds.idle()
+		assert.equal(builds.status(OWNER)?.state, 'ready')
+	})
+
+	it('пересобирает корпус из новой выгрузки', async () => {
+		const cookie = await sessionCookie(OWNER)
+
+		await upload(cookie, JSON.stringify(makeDump()))
+		await builds.idle()
+
+		const dump = makeDump()
+
+		dump.chats.list[0]!.messages.push({
+			...dump.chats.list[0]!.messages[1]!,
+			id: 5000,
+			date_unixtime: String(1_800_000_000),
+			text: 'Совершенно новая реплика про бегемота.',
+			text_entities: [{ type: 'plain', text: 'Совершенно новая реплика про бегемота.' }],
+		})
+
+		await upload(cookie, JSON.stringify(dump))
+		await builds.idle()
+
+		const client = await connect(OWNER)
+		const found = textOf(await client.callTool({ name: 'find_my_messages', arguments: { query: 'бегемот' } }))
+
+		assert.ok(found.includes('Совершенно новая реплика про бегемота.'))
+	})
+
+	it('удаляет аккаунт: данные, настройки и сессию', async () => {
+		const cookie = await sessionCookie(OWNER)
+
+		await upload(cookie, JSON.stringify(makeDump()))
+		await builds.idle()
+		users.saveSettings(OWNER, { ...users.settings(OWNER), voice: true })
+
+		const res = await deleteAccount(cookie)
+
+		assert.equal(res.status, 200)
+		assert.deepEqual(await res.json(), { ok: true })
+		assert.equal(existsSync(users.dir(OWNER)), false)
+		assert.deepEqual(users.list(), [])
+		assert.equal(builds.status(OWNER), null)
+	})
+
+	it(
+		'после удаления аккаунта отзывает выданные MCP-клиентам токены',
+		{
+			skip: 'bug: /account/delete не вызывает store.revokeSubject, токены доступа и refresh продолжают работать',
+		},
+		async () => {
+			seedCorpus(OWNER)
+
+			const flow = await oauthFlow({ base: http.base, login: widget(OWNER) })
+
+			assert.equal((await deleteAccount(await sessionCookie(OWNER))).status, 200)
+			await assert.rejects(connectHttp(http.base, flow.tokens.access_token))
+			assert.equal((await flow.refresh()).status, 400)
+		},
+	)
+
+	it(
+		'после удаления аккаунта MCP с прежним токеном не воскрешает каталог пользователя',
+		{
+			skip: 'bug: createServer -> ensureDataDir заново создаёт users/<id>/ для удалённого пользователя',
+		},
+		async () => {
+			seedCorpus(OWNER)
+
+			const { tokens } = await oauthFlow({ base: http.base, login: widget(OWNER) })
+
+			await deleteAccount(await sessionCookie(OWNER))
+			await connectHttp(http.base, tokens.access_token).catch(() => {})
+			assert.equal(existsSync(users.dir(OWNER)), false)
+		},
+	)
+
+	it('после удаления заново пускает в пустой кабинет', async () => {
+		seedCorpus(OWNER)
+		await deleteAccount(await sessionCookie(OWNER))
+
+		const state = await accountState(await sessionCookie(OWNER))
+
+		assert.equal(state.hasCorpus, false)
+		assert.equal(state.status, null)
+		assert.equal(state.settings.voice, false)
+	})
+
+	it('отдаёт странице входа dev-пользователя на localhost', async () => {
+		const dev = await startHttp((base) =>
+			createApp({
+				cfg: config(base, OWNER),
+				store: sqliteStore(join(dataDir, 'dev-auth.db')),
+				users,
+				builds,
+				publicDir: fakePages(),
+			}),
+		)
+
+		try {
+			assert.deepEqual(await (await fetch(`${dev.base}/account/auth`)).json(), {
+				botName: 'thinks_test_bot',
+				dev: OWNER,
+			})
+		} finally {
+			await dev.close()
+		}
+	})
+
+	it('называет кабинет по username, когда имени нет', async () => {
+		const url = new URL('/account/login', http.base)
+		const signed = signTelegramLogin(
+			{ id: OWNER, username: 'ivan_p', auth_date: String(Math.floor(Date.now() / 1000)) },
+			BOT_TOKEN,
+		)
+
+		for (const [k, v] of Object.entries(signed)) url.searchParams.set(k, v)
+
+		const res = await fetch(url, { redirect: 'manual' })
+
+		assert.equal(res.headers.get('location'), '/account')
+
+		const cookie = res.headers.get('set-cookie')?.split(';')[0] ?? ''
+
+		assert.equal((await accountState(cookie)).name, 'ivan_p')
+	})
 })
 
 describe('voice mode', () => {

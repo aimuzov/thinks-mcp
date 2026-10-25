@@ -1,0 +1,276 @@
+{
+	"server": {
+		"name": "thinks-mcp",
+		"capabilities": ["prompts", "resources", "tools"],
+		"instructions": null
+	},
+	"tools": [
+		{
+			"name": "check_as_me",
+			"title": "Проверить, похоже ли на меня",
+			"description": "Сверяет готовый текст с измеренным профилем владельца архива и возвращает оценку 0–100 и список конкретных отклонений: длина, канцелярит, чужие эмодзи, списки, нетипичная пунктуация. Проверка детерминированная, без модели. Вызывай после того, как написал текст по брифу от write_as_me, reply_as_me или rephrase_as_me, и переписывай текст, пока оценка не станет высокой.",
+			"inputSchema": {
+				"type": "object",
+				"properties": {
+					"text": {
+						"type": "string",
+						"minLength": 1,
+						"description": "Проверяемый текст. Если это несколько сообщений -- по одному на строку."
+					},
+					"register": {
+						"type": "string",
+						"enum": ["dm", "group", "longform", "code", "jsdoc"],
+						"description": "Регистр: dm -- личная переписка, group -- групповой чат, longform -- длинный авторский текст (пост, развёрнутое объяснение), code -- инлайн-комментарий в коде, jsdoc -- докблок. Для комментариев в коде брать только code или jsdoc: чат-регистры замерены по переписке и в код не годятся."
+					},
+					"code": {
+						"description": "Код, который комментируешь. Передавай для register code и jsdoc: тогда проверка поймает пересказ кода -- главный запрет, который иначе не виден.",
+						"type": "string"
+					}
+				},
+				"required": ["text"]
+			}
+		},
+		{
+			"name": "find_my_messages",
+			"title": "Найти мои сообщения",
+			"description": "Ищет по архиву настоящие сообщения владельца: \"как я обычно отказываю\", \"что я писал про переезд\". Возвращает найденные ходы целиком, вместе с сообщением, на которое они отвечали. Полезен и сам по себе, и чтобы проверить, что подкладывается в брифы.",
+			"inputSchema": {
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"minLength": 1,
+						"description": "Что искать: тема, слова, ситуация."
+					},
+					"register": {
+						"type": "string",
+						"enum": ["dm", "group", "longform", "code", "jsdoc"],
+						"description": "Регистр: dm -- личная переписка, group -- групповой чат, longform -- длинный авторский текст (пост, развёрнутое объяснение), code -- инлайн-комментарий в коде, jsdoc -- докблок. Для комментариев в коде брать только code или jsdoc: чат-регистры замерены по переписке и в код не годятся."
+					},
+					"lang": {
+						"type": "string",
+						"enum": ["ru", "en"],
+						"description": "Язык примеров. Осмысленно для code и jsdoc, где используются оба."
+					},
+					"limit": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 50
+					},
+					"yearFrom": {
+						"description": "Искать только начиная с этого года.",
+						"type": "integer",
+						"minimum": -9007199254740991,
+						"maximum": 9007199254740991
+					},
+					"matchIncoming": {
+						"description": "Искать по входящим сообщениям собеседников, а не по моим ответам.",
+						"type": "boolean"
+					}
+				},
+				"required": ["query"]
+			}
+		},
+		{
+			"name": "rephrase_as_me",
+			"title": "Переформулировать как я",
+			"description": "Готовит бриф для переписывания готового текста голосом владельца архива с сохранением смысла. ВАЖНО: возвращает бриф, а не переписанный текст. Используй, когда текст уже есть, но звучит не как владелец.",
+			"inputSchema": {
+				"type": "object",
+				"properties": {
+					"text": {
+						"type": "string",
+						"minLength": 1,
+						"description": "Текст, который нужно переформулировать."
+					},
+					"register": {
+						"type": "string",
+						"enum": ["dm", "group", "longform", "code", "jsdoc"],
+						"description": "Регистр: dm -- личная переписка, group -- групповой чат, longform -- длинный авторский текст (пост, развёрнутое объяснение), code -- инлайн-комментарий в коде, jsdoc -- докблок. Для комментариев в коде брать только code или jsdoc: чат-регистры замерены по переписке и в код не годятся."
+					},
+					"examples": {
+						"type": "integer",
+						"minimum": 4,
+						"maximum": 40,
+						"description": "Сколько примеров подложить в бриф (по умолчанию 18)."
+					}
+				},
+				"required": ["text"]
+			}
+		},
+		{
+			"name": "reply_as_me",
+			"title": "Ответить как я",
+			"description": "Готовит бриф для ответа на входящее сообщение голосом владельца архива. Примеры подбираются по похожим входящим сообщениям из реальной переписки -- то есть показывает, как он отвечал именно на такое. ВАЖНО: возвращает бриф, а не готовый ответ; ответ пишет вызывающая модель. Используй, когда есть чужое сообщение и нужно на него ответить.",
+			"inputSchema": {
+				"type": "object",
+				"properties": {
+					"incoming": {
+						"type": "string",
+						"minLength": 1,
+						"description": "Текст входящего сообщения, на которое нужно ответить."
+					},
+					"hint": {
+						"description": "Что по смыслу нужно ответить, если это уже решено.",
+						"type": "string"
+					},
+					"register": {
+						"type": "string",
+						"enum": ["dm", "group", "longform", "code", "jsdoc"],
+						"description": "Регистр: dm -- личная переписка, group -- групповой чат, longform -- длинный авторский текст (пост, развёрнутое объяснение), code -- инлайн-комментарий в коде, jsdoc -- докблок. Для комментариев в коде брать только code или jsdoc: чат-регистры замерены по переписке и в код не годятся."
+					},
+					"examples": {
+						"type": "integer",
+						"minimum": 4,
+						"maximum": 40,
+						"description": "Сколько примеров подложить в бриф (по умолчанию 18)."
+					}
+				},
+				"required": ["incoming"]
+			}
+		},
+		{
+			"name": "write_as_me",
+			"title": "Написать как я",
+			"description": "Готовит всё необходимое, чтобы написать текст голосом владельца архива: измеренный стиль-профиль, его настоящие сообщения по теме запроса, числовые ограничения и формат ответа. ВАЖНО: инструмент возвращает не готовый текст, а бриф -- писать по нему должна вызывающая модель. Используй, когда нужно сочинить сообщение, пост или ответ от лица владельца.",
+			"inputSchema": {
+				"type": "object",
+				"properties": {
+					"brief": {
+						"type": "string",
+						"minLength": 1,
+						"description": "Что нужно написать: тема, суть, кому и зачем."
+					},
+					"register": {
+						"type": "string",
+						"enum": ["dm", "group", "longform", "code", "jsdoc"],
+						"description": "Регистр: dm -- личная переписка, group -- групповой чат, longform -- длинный авторский текст (пост, развёрнутое объяснение), code -- инлайн-комментарий в коде, jsdoc -- докблок. Для комментариев в коде брать только code или jsdoc: чат-регистры замерены по переписке и в код не годятся."
+					},
+					"lang": {
+						"type": "string",
+						"enum": ["ru", "en"],
+						"description": "Язык примеров. Осмысленно для code и jsdoc, где используются оба."
+					},
+					"length": {
+						"description": "Желаемый объём относительно обычного для этого регистра.",
+						"type": "string",
+						"enum": ["short", "normal", "long"]
+					},
+					"examples": {
+						"type": "integer",
+						"minimum": 4,
+						"maximum": 40,
+						"description": "Сколько примеров подложить в бриф (по умолчанию 18)."
+					}
+				},
+				"required": ["brief"]
+			}
+		}
+	],
+	"prompts": [
+		{
+			"name": "talk-like-me",
+			"title": "Говори как я",
+			"description": "Весь этот разговор Claude отвечает тебе твоим же голосом, по профилю из архива."
+		},
+		{
+			"name": "as-me",
+			"title": "Написать как я",
+			"description": "Сочинить текст голосом владельца архива.",
+			"arguments": [
+				{
+					"name": "task",
+					"description": "Что нужно написать.",
+					"required": true
+				}
+			]
+		},
+		{
+			"name": "reply-as-me",
+			"title": "Ответить как я",
+			"description": "Ответить на входящее сообщение голосом владельца архива.",
+			"arguments": [
+				{
+					"name": "incoming",
+					"description": "Сообщение, на которое нужно ответить.",
+					"required": true
+				},
+				{
+					"name": "hint",
+					"description": "Что по смыслу ответить.",
+					"required": false
+				}
+			]
+		},
+		{
+			"name": "comment-as-me",
+			"title": "Прокомментировать как я",
+			"description": "Написать комментарий к коду голосом владельца архива.",
+			"arguments": [
+				{
+					"name": "code",
+					"description": "Код, который нужно прокомментировать.",
+					"required": true
+				},
+				{
+					"name": "kind",
+					"description": "jsdoc -- докблок, иначе инлайн-комментарий.",
+					"required": false
+				}
+			]
+		}
+	],
+	"resources": [
+		{
+			"name": "style-profile",
+			"title": "Стиль-профиль (личная переписка)",
+			"uri": "style://profile",
+			"description": "Как пишет владелец архива: длины, ритм, пунктуация, эмодзи, словечки и то, чего он не делает. Всё замерено по выгрузке.",
+			"mimeType": "text/markdown"
+		},
+		{
+			"name": "style-profile-dm",
+			"title": "Стиль-профиль по регистру",
+			"uri": "style://profile/dm",
+			"description": "dm -- личка, group -- групповой чат, longform -- длинный текст, code -- инлайн-комментарий, jsdoc -- докблок.",
+			"mimeType": "text/markdown"
+		},
+		{
+			"name": "style-profile-group",
+			"title": "Стиль-профиль по регистру",
+			"uri": "style://profile/group",
+			"description": "dm -- личка, group -- групповой чат, longform -- длинный текст, code -- инлайн-комментарий, jsdoc -- докблок.",
+			"mimeType": "text/markdown"
+		},
+		{
+			"name": "style-profile-longform",
+			"title": "Стиль-профиль по регистру",
+			"uri": "style://profile/longform",
+			"description": "dm -- личка, group -- групповой чат, longform -- длинный текст, code -- инлайн-комментарий, jsdoc -- докблок.",
+			"mimeType": "text/markdown"
+		},
+		{
+			"name": "style-profile-code",
+			"title": "Стиль-профиль по регистру",
+			"uri": "style://profile/code",
+			"description": "dm -- личка, group -- групповой чат, longform -- длинный текст, code -- инлайн-комментарий, jsdoc -- докблок.",
+			"mimeType": "text/markdown"
+		},
+		{
+			"name": "style-profile-jsdoc",
+			"title": "Стиль-профиль по регистру",
+			"uri": "style://profile/jsdoc",
+			"description": "dm -- личка, group -- групповой чат, longform -- длинный текст, code -- инлайн-комментарий, jsdoc -- докблок.",
+			"mimeType": "text/markdown"
+		}
+	],
+	"resourceTemplates": [
+		{
+			"name": "style-profile-register",
+			"title": "Стиль-профиль по регистру",
+			"uriTemplate": "style://profile/{register}",
+			"description": "dm -- личка, group -- групповой чат, longform -- длинный текст, code -- инлайн-комментарий, jsdoc -- докблок.",
+			"mimeType": "text/markdown"
+		}
+	]
+}
