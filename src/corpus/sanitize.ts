@@ -1,4 +1,4 @@
-import type { TextEntity } from './types.js'
+import type { TextEntity } from './types.ts'
 
 /**
  * Placeholders keep the shape of a sentence while dropping its payload. They are
@@ -6,12 +6,12 @@ import type { TextEntity } from './types.js'
  * that ballooned the text would skew every metric downstream.
  */
 const PLACEHOLDER: Record<string, string> = {
-  phone: '<телефон>',
-  email: '<почта>',
-  bank_card: '<карта>',
-  link: '<ссылка>',
-  mention: '@собеседник',
-  mention_name: '@собеседник',
+	phone: '<телефон>',
+	email: '<почта>',
+	bank_card: '<карта>',
+	link: '<ссылка>',
+	mention: '@собеседник',
+	mention_name: '@собеседник',
 }
 
 /** Entity types dropped outright — their text carries no voice of its own. */
@@ -23,14 +23,7 @@ const RAW_PHONE = /(?:\+?\d[\d\s()-]{9,}\d)/g
 const RAW_CARD = /\b(?:\d[ -]?){13,19}\b/g
 
 /** The bare words a placeholder contributes, so the lexicon can veto them. */
-export const PLACEHOLDER_WORDS = new Set([
-  'ссылка',
-  'телефон',
-  'почта',
-  'карта',
-  'имя',
-  'собеседник',
-])
+export const PLACEHOLDER_WORDS = new Set(['ссылка', 'телефон', 'почта', 'карта', 'имя', 'собеседник'])
 
 /**
  * Prefixes of the first names present in the dump.
@@ -41,19 +34,22 @@ export const PLACEHOLDER_WORDS = new Set([
  * about who they talk to.
  */
 export function namePrefixes(names: Iterable<string>, length = 4): Set<string> {
-  const out = new Set<string>()
-  for (const name of names) {
-    const first = name.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
-    if (first.length >= length) out.add(first.slice(0, length))
-  }
-  return out
+	const out = new Set<string>()
+
+	for (const name of names) {
+		const first = name.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+
+		if (first.length >= length) out.add(first.slice(0, length))
+	}
+
+	return out
 }
 
-export interface Sanitizer {
-  /** Render entities to plain text with private data removed. */
-  clean(entities: TextEntity[]): string
-  /** Same, for text that never had entities (reply context excerpts). */
-  cleanText(text: string): string
+export type Sanitizer = {
+	/** Render entities to plain text with private data removed. */
+	clean(entities: TextEntity[]): string
+	/** Same, for text that never had entities (reply context excerpts). */
+	cleanText(text: string): string
 }
 
 /**
@@ -66,59 +62,67 @@ export interface Sanitizer {
  * metadata regardless: chats and senders are stored under pseudonyms.
  */
 export function createSanitizer(surnames: Iterable<string>): Sanitizer {
-  const list = [
-    ...new Set([...surnames].map(s => s.trim()).filter(s => s.length >= 4)),
-  ]
-  // Longest first so "Ивановский" is not half-matched by "Иванов".
-  list.sort((a, b) => b.length - a.length)
-  const surnameRe = list.length
-    ? new RegExp(`\\b(?:${list.map(escapeRe).join('|')})\\w*`, 'gi')
-    : null
+	const list = [...new Set([...surnames].map((s) => s.trim()).filter((s) => s.length >= 4))]
 
-  const scrub = (text: string): string => {
-    let out = text
-      .replace(RAW_EMAIL, PLACEHOLDER.email)
-      .replace(RAW_CARD, PLACEHOLDER.bank_card)
-      .replace(RAW_PHONE, m => (digitCount(m) >= 10 ? PLACEHOLDER.phone : m))
-    if (surnameRe) out = out.replace(surnameRe, '<имя>')
-    return out.replace(/[ \t]+/g, ' ').trim()
-  }
+	// Longest first so "Ивановский" is not half-matched by "Иванов".
+	list.sort((a, b) => b.length - a.length)
+	const surnameRe = list.length ? new RegExp(`\\b(?:${list.map(escapeRe).join('|')})\\w*`, 'gi') : null
 
-  return {
-    clean(entities) {
-      const parts: string[] = []
-      for (const e of entities) {
-        if (DROPPED.has(e.type)) continue
-        // text_link keeps its visible text — that text is the author's own
-        // words, only the href behind it is dropped.
-        const replacement = e.type === 'text_link' ? null : PLACEHOLDER[e.type]
-        parts.push(replacement ?? e.text)
-      }
-      return scrub(parts.join(''))
-    },
-    cleanText: scrub,
-  }
+	const scrub = (text: string): string => {
+		let out = text
+			.replace(RAW_EMAIL, PLACEHOLDER.email)
+			.replace(RAW_CARD, PLACEHOLDER.bank_card)
+			.replace(RAW_PHONE, (m) => (digitCount(m) >= 10 ? PLACEHOLDER.phone : m))
+
+		if (surnameRe) out = out.replace(surnameRe, '<имя>')
+
+		return out.replace(/[ \t]+/g, ' ').trim()
+	}
+
+	return {
+		clean(entities) {
+			const parts: string[] = []
+
+			for (const e of entities) {
+				if (DROPPED.has(e.type)) continue
+
+				// text_link keeps its visible text — that text is the author's own
+				// words, only the href behind it is dropped.
+				const replacement = e.type === 'text_link' ? null : PLACEHOLDER[e.type]
+
+				parts.push(replacement ?? e.text)
+			}
+
+			return scrub(parts.join(''))
+		},
+		cleanText: scrub,
+	}
 }
 
 /** Collect sender surnames across the dump, to feed createSanitizer. */
 export function collectSurnames(names: Iterable<string>): Set<string> {
-  const out = new Set<string>()
-  for (const name of names) {
-    const words = name.trim().split(/\s+/)
-    // "Ivan Petrov" -> Petrov. Single-word names carry no surname.
-    if (words.length >= 2) {
-      for (const w of words.slice(1)) out.add(w)
-    }
-  }
-  return out
+	const out = new Set<string>()
+
+	for (const name of names) {
+		const words = name.trim().split(/\s+/)
+
+		// "Ivan Petrov" -> Petrov. Single-word names carry no surname.
+		if (words.length >= 2) {
+			for (const w of words.slice(1)) out.add(w)
+		}
+	}
+
+	return out
 }
 
 function digitCount(s: string): number {
-  let n = 0
-  for (const ch of s) if (ch >= '0' && ch <= '9') n++
-  return n
+	let n = 0
+
+	for (const ch of s) if (ch >= '0' && ch <= '9') n++
+
+	return n
 }
 
 function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

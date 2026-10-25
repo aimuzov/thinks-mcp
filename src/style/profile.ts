@@ -1,53 +1,54 @@
-import type { NeverMark } from '../config.js'
-import type { Db } from '../store/db.js'
-import { isCodeRegister, type Register } from '../corpus/types.js'
-import { measure, type RegisterMetrics } from './metrics.js'
-import type { Marker } from './lexicon.js'
+import type { NeverMark } from '#thinks/config'
+import { isCodeRegister, type Register } from '#thinks/corpus/types'
+import { allTurns } from '#thinks/search/query'
+import type { Db } from '#thinks/store/db'
+
 import {
-  DOUBLE_HYPHEN,
-  FOREIGN_TYPOGRAPHY,
-  listShare,
-  markdownShare,
-  RARE_SHARE,
-  shareOf,
-  TYPO_FOREIGN_SHARE,
-  TYPO_OWN_SHARE,
-  type AntiPattern,
-  type Probe,
-} from './antipatterns.js'
-import type { CodeMetrics } from './codeMetrics.js'
-import { codeConstraints, renderCodeProfile } from './codeProfile.js'
-import { allTurns } from '../search/query.js'
+	DOUBLE_HYPHEN,
+	FOREIGN_TYPOGRAPHY,
+	listShare,
+	markdownShare,
+	RARE_SHARE,
+	shareOf,
+	TYPO_FOREIGN_SHARE,
+	TYPO_OWN_SHARE,
+	type AntiPattern,
+	type Probe,
+} from './antipatterns.ts'
+import type { CodeMetrics } from './code-metrics.ts'
+import { codeConstraints, renderCodeProfile } from './code-profile.ts'
+import type { Marker } from './lexicon.ts'
+import { measure, type RegisterMetrics } from './metrics.ts'
 
 export const CHAT_REGISTERS: Register[] = ['dm', 'group', 'longform']
 export const REGISTERS: Register[] = [...CHAT_REGISTERS, 'code', 'jsdoc']
 
-export interface StyleProfile {
-  builtAt: string
-  /** Measured over the whole archive. */
-  registers: Record<string, RegisterMetrics>
-  /**
-   * Measured over the last few years only — how the owner writes *now*.
-   *
-   * Over a decade of chat history punctuation, message length and rhythm all
-   * shift enough to matter. Constraints handed to a model come from this
-   * window, so it imitates the current author rather than an average of every
-   * year they have ever written.
-   */
-  recent: Record<string, RegisterMetrics>
-  /** First year included in `recent`. */
-  recentFrom: number
-  markers: Marker[]
-  antiPatterns: AntiPattern[]
-  /** Typographic marks in the chat corpus. Absent in a profile built before. */
-  typography?: AntiPattern[]
-  /** Present once the code corpus has been built. */
-  code?: CodeMetrics
-  /**
-   * Marks the owner declared in `THINKS_NEVER_MARKS`. Not stored with the
-   * profile: config, attached on load.
-   */
-  neverMarks?: NeverMark[]
+export type StyleProfile = {
+	builtAt: string
+	/** Measured over the whole archive. */
+	registers: Record<string, RegisterMetrics>
+	/**
+	 * Measured over the last few years only — how the owner writes *now*.
+	 *
+	 * Over a decade of chat history punctuation, message length and rhythm all
+	 * shift enough to matter. Constraints handed to a model come from this
+	 * window, so it imitates the current author rather than an average of every
+	 * year they have ever written.
+	 */
+	recent: Record<string, RegisterMetrics>
+	/** First year included in `recent`. */
+	recentFrom: number
+	markers: Marker[]
+	antiPatterns: AntiPattern[]
+	/** Typographic marks in the chat corpus. Absent in a profile built before. */
+	typography?: AntiPattern[]
+	/** Present once the code corpus has been built. */
+	code?: CodeMetrics
+	/**
+	 * Marks the owner declared in `THINKS_NEVER_MARKS`. Not stored with the
+	 * profile: config, attached on load.
+	 */
+	neverMarks?: NeverMark[]
 }
 
 /**
@@ -60,61 +61,60 @@ export interface StyleProfile {
  */
 type ProfilePart = 'chat' | 'code'
 
-interface ChatPart {
-  builtAt: string
-  registers: Record<string, RegisterMetrics>
-  recent?: Record<string, RegisterMetrics>
-  recentFrom?: number
-  markers: Marker[]
-  antiPatterns: AntiPattern[]
-  typography?: AntiPattern[]
+type ChatPart = {
+	builtAt: string
+	registers: Record<string, RegisterMetrics>
+	recent?: Record<string, RegisterMetrics>
+	recentFrom?: number
+	markers: Marker[]
+	antiPatterns: AntiPattern[]
+	typography?: AntiPattern[]
 }
 
-interface CodePart {
-  builtAt: string
-  registers: Record<string, RegisterMetrics>
-  recent?: Record<string, RegisterMetrics>
-  recentFrom?: number
-  code: CodeMetrics
+type CodePart = {
+	builtAt: string
+	registers: Record<string, RegisterMetrics>
+	recent?: Record<string, RegisterMetrics>
+	recentFrom?: number
+	code: CodeMetrics
 }
 
 function savePart(db: Db, key: ProfilePart, value: unknown): void {
-  db.prepare(
-    'INSERT INTO profile (key, value) VALUES (?, ?) ' +
-      'ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-  ).run(key, JSON.stringify(value))
+	db.prepare(
+		'INSERT INTO profile (key, value) VALUES (?, ?) ' + 'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+	).run(key, JSON.stringify(value))
 }
 
 function loadPart<T>(db: Db, key: ProfilePart): T | null {
-  const row = db.prepare('SELECT value FROM profile WHERE key = ?').get(key) as
-    | { value: string }
-    | undefined
-  return row ? (JSON.parse(row.value) as T) : null
+	const row = db.prepare('SELECT value FROM profile WHERE key = ?').get(key) as { value: string } | undefined
+
+	return row ? (JSON.parse(row.value) as T) : null
 }
 
 export function saveChatProfile(db: Db, part: ChatPart): void {
-  savePart(db, 'chat', part)
+	savePart(db, 'chat', part)
 }
 
 export function saveCodeProfile(db: Db, part: CodePart): void {
-  savePart(db, 'code', part)
+	savePart(db, 'code', part)
 }
 
 export function loadProfile(db: Db): StyleProfile | null {
-  const chat = loadPart<ChatPart>(db, 'chat')
-  const code = loadPart<CodePart>(db, 'code')
-  if (!chat && !code) return null
+	const chat = loadPart<ChatPart>(db, 'chat')
+	const code = loadPart<CodePart>(db, 'code')
 
-  return {
-    builtAt: chat?.builtAt ?? code?.builtAt ?? '',
-    registers: { ...(chat?.registers ?? {}), ...(code?.registers ?? {}) },
-    recent: { ...(chat?.recent ?? {}), ...(code?.recent ?? {}) },
-    recentFrom: chat?.recentFrom ?? code?.recentFrom ?? 0,
-    markers: chat?.markers ?? [],
-    antiPatterns: chat?.antiPatterns ?? [],
-    ...(chat?.typography ? { typography: chat.typography } : {}),
-    ...(code ? { code: code.code } : {}),
-  }
+	if (!chat && !code) return null
+
+	return {
+		builtAt: chat?.builtAt ?? code?.builtAt ?? '',
+		registers: { ...chat?.registers, ...code?.registers },
+		recent: { ...chat?.recent, ...code?.recent },
+		recentFrom: chat?.recentFrom ?? code?.recentFrom ?? 0,
+		markers: chat?.markers ?? [],
+		antiPatterns: chat?.antiPatterns ?? [],
+		...(chat?.typography ? { typography: chat.typography } : {}),
+		...(code ? { code: code.code } : {}),
+	}
 }
 
 /**
@@ -124,13 +124,12 @@ export function loadProfile(db: Db): StyleProfile | null {
  */
 const MIN_RECENT_MESSAGES = 200
 
-export function metricsFor(
-  profile: StyleProfile,
-  register: Register
-): RegisterMetrics | undefined {
-  const recent = profile.recent?.[register]
-  if (recent && recent.messages >= MIN_RECENT_MESSAGES) return recent
-  return profile.registers[register]
+export function metricsFor(profile: StyleProfile, register: Register): RegisterMetrics | undefined {
+	const recent = profile.recent?.[register]
+
+	if (recent && recent.messages >= MIN_RECENT_MESSAGES) return recent
+
+	return profile.registers[register]
 }
 
 /**
@@ -140,19 +139,17 @@ export function metricsFor(
  * Chat and code are counted separately and differ where it matters: `--` is
  * absent from the archive's messages and normal in its comments.
  */
-export function typographyFor(
-  profile: StyleProfile,
-  register: Register
-): AntiPattern[] | undefined {
-  if (isCodeRegister(register)) {
-    return profile.code?.typography?.[register as 'code' | 'jsdoc']
-  }
-  return profile.typography
+export function typographyFor(profile: StyleProfile, register: Register): AntiPattern[] | undefined {
+	if (isCodeRegister(register)) {
+		return profile.code?.typography?.[register as 'code' | 'jsdoc']
+	}
+
+	return profile.typography
 }
 
-export interface ForeignMark extends Probe {
-  share: number
-}
+export type ForeignMark = {
+	share: number
+} & Probe
 
 /**
  * Marks measured as foreign for the register, with their shares.
@@ -161,58 +158,53 @@ export interface ForeignMark extends Probe {
  * what to type instead, and a second finding for the same mark would only
  * double the penalty and argue with it.
  */
-export function foreignMarks(
-  profile: StyleProfile,
-  register: Register
-): ForeignMark[] {
-  const measured = typographyFor(profile, register)
-  if (!measured) return []
+export function foreignMarks(profile: StyleProfile, register: Register): ForeignMark[] {
+	const measured = typographyFor(profile, register)
 
-  const declared = profile.neverMarks ?? []
-  return FOREIGN_TYPOGRAPHY.filter(
-    probe => !declared.some(n => probe.test.test(n.mark))
-  )
-    .map(probe => ({ ...probe, share: shareOf(measured, probe.label) }))
-    .filter(
-      (x): x is ForeignMark =>
-        x.share !== undefined && x.share < TYPO_FOREIGN_SHARE
-    )
-    .sort((a, b) => a.share - b.share)
+	if (!measured) return []
+
+	const declared = profile.neverMarks ?? []
+
+	return FOREIGN_TYPOGRAPHY.filter((probe) => !declared.some((n) => probe.test.test(n.mark)))
+		.map((probe) => ({ ...probe, share: shareOf(measured, probe.label) }))
+		.filter((x): x is ForeignMark => x.share !== undefined && x.share < TYPO_FOREIGN_SHARE)
+		.sort((a, b) => a.share - b.share)
 }
 
 /** Each declared mark with its stand-in, or bare when it has none. */
 function renderNeverMarks(marks: NeverMark[]): string {
-  return marks
-    .map(n => (n.standIn ? `\`${n.standIn}\` вместо ${n.mark}` : n.mark))
-    .join(', ')
+	return marks.map((n) => (n.standIn ? `\`${n.standIn}\` вместо ${n.mark}` : n.mark)).join(', ')
 }
 
 /** Measure the given registers off the stored corpus. */
 export function measureRegisters(
-  db: Db,
-  registers: Register[] = CHAT_REGISTERS,
-  yearFrom?: number
+	db: Db,
+	registers: Register[] = CHAT_REGISTERS,
+	yearFrom?: number,
 ): Record<string, RegisterMetrics> {
-  const out: Record<string, RegisterMetrics> = {}
-  for (const register of registers) {
-    const rows = allTurns(db, { register, yearFrom })
-    out[register] = measure(
-      rows.map(r => ({
-        chatKey: '',
-        register: r.register as 'dm' | 'group',
-        longform: Boolean(r.longform),
-        ts: r.ts,
-        year: r.year,
-        parts: r.parts,
-        text: r.text,
-        chars: r.chars,
-        contextIn: r.contextIn,
-        contextExplicit: r.contextExplicit,
-        contextLag: null,
-      }))
-    )
-  }
-  return out
+	const out: Record<string, RegisterMetrics> = {}
+
+	for (const register of registers) {
+		const rows = allTurns(db, { register, yearFrom })
+
+		out[register] = measure(
+			rows.map((r) => ({
+				chatKey: '',
+				register: r.register as 'dm' | 'group',
+				longform: Boolean(r.longform),
+				ts: r.ts,
+				year: r.year,
+				parts: r.parts,
+				text: r.text,
+				chars: r.chars,
+				contextIn: r.contextIn,
+				contextExplicit: r.contextExplicit,
+				contextLag: null,
+			})),
+		)
+	}
+
+	return out
 }
 
 const pct = (share: number) => `${Math.round(share * 1000) / 10}%`
@@ -225,128 +217,135 @@ const pct = (share: number) => `${Math.round(share * 1000) / 10}%`
  * model given "медиана 19 символов, 90% короче 61" has something it can check
  * itself against — and `check_as_me` checks the same numbers back.
  */
-export function renderProfile(
-  profile: StyleProfile,
-  register: Register = 'dm',
-  opts: { full?: boolean } = {}
-): string {
-  if (isCodeRegister(register)) {
-    if (!profile.code) {
-      return 'Корпус кода не собран. Запусти `thinks-mcp code <пути к репозиториям>`.'
-    }
-    return [
-      renderCodeProfile(profile.code, register as 'code' | 'jsdoc', opts),
-      ...typographySection(profile, register),
-    ].join('\n')
-  }
+export function renderProfile(profile: StyleProfile, register: Register = 'dm', opts: { full?: boolean } = {}): string {
+	if (isCodeRegister(register)) {
+		if (!profile.code) {
+			return 'Корпус кода не собран. Запусти `thinks-mcp code <пути к репозиториям>`.'
+		}
 
-  const m = metricsFor(profile, register)
-  if (!m || !m.messages) return 'Профиль для этого регистра пуст.'
+		return [
+			renderCodeProfile(profile.code, register as 'code' | 'jsdoc', opts),
+			...typographySection(profile, register),
+		].join('\n')
+	}
 
-  const all = profile.registers[register]
-  const isRecent = m !== all && profile.recentFrom > 0
+	const m = metricsFor(profile, register)
 
-  const lines: string[] = []
-  const label =
-    register === 'dm'
-      ? 'личная переписка'
-      : register === 'group'
-        ? 'групповой чат'
-        : 'длинный авторский текст'
+	if (!m || !m.messages) return 'Профиль для этого регистра пуст.'
 
-  lines.push(`# Как я пишу -- ${label}`)
-  lines.push('')
-  lines.push(
-    `Замерено по ${m.turns.toLocaleString('ru')} ходам ` +
-      `(${m.messages.toLocaleString('ru')} сообщений)` +
-      (isRecent
-        ? ` из моего архива с ${profile.recentFrom} года -- это то, как я пишу сейчас.`
-        : ' из моего архива.')
-  )
-  if (isRecent && all?.messages) {
-    lines.push(
-      `За всё время цифры другие (медиана ${all.messageLength.median}, ` +
-        `точка в конце ${pct(all.punctuation.endsPeriod)}) -- стиль менялся, ` +
-        'ориентируйся на свежие.'
-    )
-  }
-  lines.push('')
+	const all = profile.registers[register]
+	const isRecent = m !== all && profile.recentFrom > 0
 
-  lines.push('## Длина')
-  lines.push(
-    `- Отдельное сообщение: медиана ${m.messageLength.median} символов, ` +
-      `четверть короче ${m.messageLength.p25}, 90% короче ${m.messageLength.p90}.`
-  )
-  lines.push(
-    `- Весь ответ целиком: медиана ${m.turnLength.median}, 90% короче ${m.turnLength.p90}.`
-  )
-  lines.push(
-    '- Длиннее p90 -- уже не похоже на меня. Это потолок, а не ориентир.'
-  )
-  lines.push('')
+	const lines: string[] = []
+	const label =
+		register === 'dm' ? 'личная переписка' : register === 'group' ? 'групповой чат' : 'длинный авторский текст'
 
-  if (register !== 'longform') {
-    lines.push('## Ритм')
-    lines.push(
-      `- ${pct(m.bursts.messagesInBursts)} моих сообщений идут очередью: ` +
-        'мысль разбивается на несколько коротких подряд, а не пакуется в абзац.'
-    )
-    lines.push(
-      `- Ответ из одного сообщения -- ${pct(m.bursts.single)}, из двух -- ` +
-        `${pct(m.bursts.double)}, из трёх -- ${pct(m.bursts.triple)}, ` +
-        `из четырёх и больше -- ${pct(m.bursts.more)}.`
-    )
-    lines.push('')
-  }
+	lines.push(`# Как я пишу -- ${label}`)
+	lines.push('')
 
-  const p = m.punctuation
-  lines.push('## Пунктуация и регистр')
-  lines.push(`- С заглавной буквы начинаю ${pct(p.startsCapital)} сообщений.`)
-  lines.push(
-    `- Точка в конце -- ${pct(p.endsPeriod)}, знак вопроса -- ${pct(p.endsQuestion)}, ` +
-      `закрывающая скобка вместо смайла -- ${pct(p.endsParen)}, ` +
-      `без знака -- ${pct(p.endsNothing)}.`
-  )
-  lines.push(
-    `- Восклицательный знак -- редкость: ${pct(p.hasExclamation)} сообщений. ` +
-      `Многоточие -- ${pct(p.hasEllipsis)}, тире в середине фразы -- ${pct(p.hasDash)}.`
-  )
-  lines.push('')
+	lines.push(
+		`Замерено по ${m.turns.toLocaleString('ru')} ходам ` +
+			`(${m.messages.toLocaleString('ru')} сообщений)` +
+			(isRecent
+				? ` из моего архива с ${profile.recentFrom} года -- это то, как я пишу сейчас.`
+				: ' из моего архива.'),
+	)
 
-  if (m.emoji.length) {
-    lines.push('## Эмодзи')
-    const palette = m.emoji.slice(0, 6).map(e => `${e.char} (${e.count})`)
-    lines.push(`- Палитра узкая: ${palette.join(', ')}.`)
-    lines.push('- Всё, чего нет в этом списке, звучит как чужой человек.')
-    lines.push('')
-  }
+	if (isRecent && all?.messages) {
+		lines.push(
+			`За всё время цифры другие (медиана ${all.messageLength.median}, ` +
+				`точка в конце ${pct(all.punctuation.endsPeriod)}) -- стиль менялся, ` +
+				'ориентируйся на свежие.',
+		)
+	}
 
-  if (profile.markers.length) {
-    lines.push('## Мои слова')
-    lines.push(
-      '- Отобраны сравнением с тем, как пишут мои собеседники, -- это то, ' +
-        'что отличает меня, а не то, что часто в русском языке:'
-    )
-    const words = profile.markers.slice(0, opts.full ? 60 : 30).map(x => x.word)
-    lines.push(`  ${words.join(', ')}.`)
-    lines.push('')
-  }
+	lines.push('')
 
-  const rare = profile.antiPatterns
-    .filter(a => a.share < RARE_SHARE)
-    .slice(0, 10)
-  if (rare.length) {
-    lines.push('## Чего я не делаю')
-    lines.push('- Практически не встречается в архиве (доля сообщений):')
-    for (const a of rare) {
-      lines.push(`  - ${a.label} -- ${a.share}%`)
-    }
-    lines.push('')
-  }
+	lines.push('## Длина')
 
-  lines.push(...typographySection(profile, register))
+	lines.push(
+		`- Отдельное сообщение: медиана ${m.messageLength.median} символов, ` +
+			`четверть короче ${m.messageLength.p25}, 90% короче ${m.messageLength.p90}.`,
+	)
 
-  return lines.join('\n')
+	lines.push(`- Весь ответ целиком: медиана ${m.turnLength.median}, 90% короче ${m.turnLength.p90}.`)
+	lines.push('- Длиннее p90 -- уже не похоже на меня. Это потолок, а не ориентир.')
+	lines.push('')
+
+	if (register !== 'longform') {
+		lines.push('## Ритм')
+
+		lines.push(
+			`- ${pct(m.bursts.messagesInBursts)} моих сообщений идут очередью: ` +
+				'мысль разбивается на несколько коротких подряд, а не пакуется в абзац.',
+		)
+
+		lines.push(
+			`- Ответ из одного сообщения -- ${pct(m.bursts.single)}, из двух -- ` +
+				`${pct(m.bursts.double)}, из трёх -- ${pct(m.bursts.triple)}, ` +
+				`из четырёх и больше -- ${pct(m.bursts.more)}.`,
+		)
+
+		lines.push('')
+	}
+
+	const p = m.punctuation
+
+	lines.push('## Пунктуация и регистр')
+	lines.push(`- С заглавной буквы начинаю ${pct(p.startsCapital)} сообщений.`)
+
+	lines.push(
+		`- Точка в конце -- ${pct(p.endsPeriod)}, знак вопроса -- ${pct(p.endsQuestion)}, ` +
+			`закрывающая скобка вместо смайла -- ${pct(p.endsParen)}, ` +
+			`без знака -- ${pct(p.endsNothing)}.`,
+	)
+
+	lines.push(
+		`- Восклицательный знак -- редкость: ${pct(p.hasExclamation)} сообщений. ` +
+			`Многоточие -- ${pct(p.hasEllipsis)}, тире в середине фразы -- ${pct(p.hasDash)}.`,
+	)
+
+	lines.push('')
+
+	if (m.emoji.length) {
+		lines.push('## Эмодзи')
+		const palette = m.emoji.slice(0, 6).map((e) => `${e.char} (${e.count})`)
+
+		lines.push(`- Палитра узкая: ${palette.join(', ')}.`)
+		lines.push('- Всё, чего нет в этом списке, звучит как чужой человек.')
+		lines.push('')
+	}
+
+	if (profile.markers.length) {
+		lines.push('## Мои слова')
+
+		lines.push(
+			'- Отобраны сравнением с тем, как пишут мои собеседники, -- это то, ' +
+				'что отличает меня, а не то, что часто в русском языке:',
+		)
+
+		const words = profile.markers.slice(0, opts.full ? 60 : 30).map((x) => x.word)
+
+		lines.push(`  ${words.join(', ')}.`)
+		lines.push('')
+	}
+
+	const rare = profile.antiPatterns.filter((a) => a.share < RARE_SHARE).slice(0, 10)
+
+	if (rare.length) {
+		lines.push('## Чего я не делаю')
+		lines.push('- Практически не встречается в архиве (доля сообщений):')
+
+		for (const a of rare) {
+			lines.push(`  - ${a.label} -- ${a.share}%`)
+		}
+
+		lines.push('')
+	}
+
+	lines.push(...typographySection(profile, register))
+
+	return lines.join('\n')
 }
 
 /**
@@ -355,116 +354,117 @@ export function renderProfile(
  * Empty when the corpus was built before the probes existed: silence is the
  * honest answer there, an unmeasured mark is not a mark the owner avoids.
  */
-export function typographySection(
-  profile: StyleProfile,
-  register: Register
-): string[] {
-  const marks = foreignMarks(profile, register)
-  const hyphen = shareOf(typographyFor(profile, register), DOUBLE_HYPHEN.label)
-  const ownHyphen = hyphen !== undefined && hyphen >= TYPO_OWN_SHARE
-  const declared = profile.neverMarks ?? []
-  if (!marks.length && !ownHyphen && !declared.length) return []
+export function typographySection(profile: StyleProfile, register: Register): string[] {
+	const marks = foreignMarks(profile, register)
+	const hyphen = shareOf(typographyFor(profile, register), DOUBLE_HYPHEN.label)
+	const ownHyphen = hyphen !== undefined && hyphen >= TYPO_OWN_SHARE
+	const declared = profile.neverMarks ?? []
 
-  const lines = ['## Знаки']
-  if (declared.length) {
-    lines.push(
-      `- Эти знаки я не набираю совсем: ${renderNeverMarks(declared)}.`
-    )
-  }
-  const until = isCodeRegister(register) ? profile.code?.typographyUntil : 0
-  if (until) {
-    lines.push(
-      `- Считано по комментариям до ${until} года: дальше я писал их с ` +
-        'ассистентом, и его знаки за мои не считаются.'
-    )
-  }
-  if (marks.length) {
-    lines.push('- Этого набора у меня почти нет (доля сообщений):')
-    for (const m of marks) lines.push(`  - ${m.label}: ${m.share}%`)
-  }
-  if (ownHyphen) {
-    lines.push(`- Тире пишу двумя дефисами: так в ${hyphen}% случаев.`)
-  }
-  lines.push('')
-  return lines
+	if (!marks.length && !ownHyphen && !declared.length) return []
+
+	const lines = ['## Знаки']
+
+	if (declared.length) {
+		lines.push(`- Эти знаки я не набираю совсем: ${renderNeverMarks(declared)}.`)
+	}
+
+	const until = isCodeRegister(register) ? profile.code?.typographyUntil : 0
+
+	if (until) {
+		lines.push(
+			`- Считано по комментариям до ${until} года: дальше я писал их с ` +
+				'ассистентом, и его знаки за мои не считаются.',
+		)
+	}
+
+	if (marks.length) {
+		lines.push('- Этого набора у меня почти нет (доля сообщений):')
+
+		for (const m of marks) lines.push(`  - ${m.label}: ${m.share}%`)
+	}
+
+	if (ownHyphen) {
+		lines.push(`- Тире пишу двумя дефисами: так в ${hyphen}% случаев.`)
+	}
+
+	lines.push('')
+
+	return lines
 }
 
 /** Numeric constraints for the CONSTRAINTS block of a brief. */
-export function constraintsOf(
-  profile: StyleProfile,
-  register: Register
-): string[] {
-  if (isCodeRegister(register)) {
-    return profile.code
-      ? [
-          ...codeConstraints(profile.code, register as 'code' | 'jsdoc'),
-          ...typographyConstraints(profile, register),
-        ]
-      : []
-  }
+export function constraintsOf(profile: StyleProfile, register: Register): string[] {
+	if (isCodeRegister(register)) {
+		return profile.code
+			? [
+					...codeConstraints(profile.code, register as 'code' | 'jsdoc'),
+					...typographyConstraints(profile, register),
+				]
+			: []
+	}
 
-  const m = metricsFor(profile, register)
-  if (!m || !m.messages) return []
+	const m = metricsFor(profile, register)
 
-  const out = [
-    `Каждое сообщение -- не длиннее ${m.messageLength.p90} символов ` +
-      `(целься в ${m.messageLength.median}).`,
-    `Весь ответ -- не длиннее ${m.turnLength.p90} символов.`,
-  ]
+	if (!m || !m.messages) return []
 
-  if (register !== 'longform') {
-    out.push(
-      `Если мысль не помещается в одно короткое сообщение -- разбей на несколько: ` +
-        `так сделано в ${pct(m.bursts.messagesInBursts)} случаев.`
-    )
-  }
+	const out = [
+		`Каждое сообщение -- не длиннее ${m.messageLength.p90} символов ` + `(целься в ${m.messageLength.median}).`,
+		`Весь ответ -- не длиннее ${m.turnLength.p90} символов.`,
+	]
 
-  const p = m.punctuation
-  out.push(
-    `Начинай с заглавной буквы (${pct(p.startsCapital)}) и ставь точку в конце ` +
-      `(${pct(p.endsPeriod)}) -- даже в коротком ответе.`
-  )
-  out.push(
-    `Восклицательные знаки почти не используй (${pct(p.hasExclamation)} сообщений).`
-  )
-  if (m.emoji.length) {
-    out.push(
-      `Эмодзи -- только из палитры: ${m.emoji
-        .slice(0, 6)
-        .map(e => e.char)
-        .join(' ')}. ` + 'Чаще всего их нет вовсе.'
-    )
-  }
-  const lists = listShare(profile.antiPatterns)
-  const markdown = markdownShare(profile.antiPatterns)
-  if (lists !== undefined && markdown !== undefined) {
-    const share = Math.max(lists, markdown)
-    if (share < RARE_SHARE) {
-      out.push(
-        `Без списков, буллетов и markdown-разметки -- в архиве их доля не больше ${share}%.`
-      )
-    }
-  }
+	if (register !== 'longform') {
+		out.push(
+			`Если мысль не помещается в одно короткое сообщение -- разбей на несколько: ` +
+				`так сделано в ${pct(m.bursts.messagesInBursts)} случаев.`,
+		)
+	}
 
-  // Blind testing against held-out pairs showed the gap: a model reproduces the
-  // shape (length, periods, several short messages) but smooths the vocabulary
-  // into literary Russian, writing the dictionary form where the archive has a
-  // clipped colloquial one. The markers already know those words; without this
-  // line nothing tells the model to actually use them.
-  const colloquial = profile.markers
-    .filter(x => x.word.length >= 3)
-    .slice(0, 12)
-    .map(x => x.word)
-  if (colloquial.length) {
-    out.push(
-      `Разговорные формы -- норма, не выправляй их в литературные: ` +
-        `${colloquial.join(', ')}.`
-    )
-  }
+	const p = m.punctuation
 
-  out.push(...typographyConstraints(profile, register))
+	out.push(
+		`Начинай с заглавной буквы (${pct(p.startsCapital)}) и ставь точку в конце ` +
+			`(${pct(p.endsPeriod)}) -- даже в коротком ответе.`,
+	)
 
-  return out
+	out.push(`Восклицательные знаки почти не используй (${pct(p.hasExclamation)} сообщений).`)
+
+	if (m.emoji.length) {
+		out.push(
+			`Эмодзи -- только из палитры: ${m.emoji
+				.slice(0, 6)
+				.map((e) => e.char)
+				.join(' ')}. ` + 'Чаще всего их нет вовсе.',
+		)
+	}
+
+	const lists = listShare(profile.antiPatterns)
+	const markdown = markdownShare(profile.antiPatterns)
+
+	if (lists !== undefined && markdown !== undefined) {
+		const share = Math.max(lists, markdown)
+
+		if (share < RARE_SHARE) {
+			out.push(`Без списков, буллетов и markdown-разметки -- в архиве их доля не больше ${share}%.`)
+		}
+	}
+
+	// Blind testing against held-out pairs showed the gap: a model reproduces the
+	// shape (length, periods, several short messages) but smooths the vocabulary
+	// into literary Russian, writing the dictionary form where the archive has a
+	// clipped colloquial one. The markers already know those words; without this
+	// line nothing tells the model to actually use them.
+	const colloquial = profile.markers
+		.filter((x) => x.word.length >= 3)
+		.slice(0, 12)
+		.map((x) => x.word)
+
+	if (colloquial.length) {
+		out.push(`Разговорные формы -- норма, не выправляй их в литературные: ` + `${colloquial.join(', ')}.`)
+	}
+
+	out.push(...typographyConstraints(profile, register))
+
+	return out
 }
 
 /**
@@ -473,31 +473,31 @@ export function constraintsOf(
  * A model types the marks of a printed book by default. The archive says which
  * of them the owner actually puts on the page, and at what rate.
  */
-export function typographyConstraints(
-  profile: StyleProfile,
-  register: Register
-): string[] {
-  const out: string[] = []
-  const declared = profile.neverMarks ?? []
-  if (declared.length) {
-    out.push(
-      `Не ставь ${declared.map(n => n.mark).join(' ')} ни в каком регистре, ` +
-        `я их не набираю: ${renderNeverMarks(declared)}.`
-    )
-  }
+export function typographyConstraints(profile: StyleProfile, register: Register): string[] {
+	const out: string[] = []
+	const declared = profile.neverMarks ?? []
 
-  const marks = foreignMarks(profile, register)
-  if (marks.length) {
-    out.push(
-      `Не ставь эти знаки: ${marks.map(m => `${m.label} (${m.share}%)`).join(', ')}. ` +
-        'Вместо тире обычный дефис, вместо ёлочек простые двойные кавычки.'
-    )
-  }
+	if (declared.length) {
+		out.push(
+			`Не ставь ${declared.map((n) => n.mark).join(' ')} ни в каком регистре, ` +
+				`я их не набираю: ${renderNeverMarks(declared)}.`,
+		)
+	}
 
-  const hyphen = shareOf(typographyFor(profile, register), DOUBLE_HYPHEN.label)
-  if (hyphen !== undefined && hyphen >= TYPO_OWN_SHARE) {
-    out.push(`Тире внутри фразы -- два дефиса: так в ${hyphen}% случаев.`)
-  }
+	const marks = foreignMarks(profile, register)
 
-  return out
+	if (marks.length) {
+		out.push(
+			`Не ставь эти знаки: ${marks.map((m) => `${m.label} (${m.share}%)`).join(', ')}. ` +
+				'Вместо тире обычный дефис, вместо ёлочек простые двойные кавычки.',
+		)
+	}
+
+	const hyphen = shareOf(typographyFor(profile, register), DOUBLE_HYPHEN.label)
+
+	if (hyphen !== undefined && hyphen >= TYPO_OWN_SHARE) {
+		out.push(`Тире внутри фразы -- два дефиса: так в ${hyphen}% случаев.`)
+	}
+
+	return out
 }

@@ -1,345 +1,297 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createHash, randomBytes } from 'node:crypto'
+import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { createServer as createHttpServer, type Server } from 'node:http'
-import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { buildCorpus } from '../corpus/build.js'
-import { makeDump } from '../testing/fixtures.js'
-import { createApp } from './app.js'
-import { AuthStore } from './auth/store.js'
-import { signTelegramLogin } from './auth/telegram.js'
-import { Tokens } from './auth/tokens.js'
-import { Builds, type BuildRunner } from './builds.js'
-import type { HttpConfig } from './config.js'
-import { Users } from './users.js'
+import { DatabaseSync } from 'node:sqlite'
+import { afterEach, beforeEach, describe, it } from 'node:test'
+import { signTelegramLogin, sqliteStore, Tokens } from '@aimuzov/infra-mcp-kit/http'
+import { connectHttp, oauthFlow, startHttp, textOf, type RunningHttp } from '@aimuzov/infra-mcp-kit/testing'
+
+import { buildCorpus } from '#thinks/corpus/build'
+import { makeDump } from '#thinks/testing/fixtures'
+
+import { createApp } from './app.ts'
+import { migrateAuthDb } from './auth-db.ts'
+import { Builds, type BuildRunner } from './builds.ts'
+import type { ThinksHttpConfig } from './config.ts'
+import { Users } from './users.ts'
 
 const BOT_TOKEN = '123:test-bot-token'
+const SECRET = 'x'.repeat(32)
 // The fixture dump belongs to user1 and talks to user2.
 const OWNER = '1'
 const STRANGER = '2'
-const REDIRECT = 'http://127.0.0.1:33418/callback'
 
-/** Builds in-process: the child-process runner needs the compiled worker. */
+/** Builds in-process: the child-process runner is covered by the build worker itself. */
 const inProcess =
-  (users: Users): BuildRunner =>
-  async job => {
-    try {
-      const cfg = { ...users.config(job.userId), ...job }
-      buildCorpus(cfg, () => {}, { expectOwnerId: `user${job.userId}` })
-      return null
-    } catch (err) {
-      return (err as Error).message
-    }
-  }
+	(users: Users): BuildRunner =>
+	async (job) => {
+		try {
+			buildCorpus({ ...users.config(job.userId), ...job }, () => {}, { expectOwnerId: `user${job.userId}` })
+
+			return null
+		} catch (err) {
+			return (err as Error).message
+		}
+	}
 
 let dataDir: string
-let base: string
-let server: Server
+let http: RunningHttp
 let users: Users
 let builds: Builds
 
-function config(publicUrl: string): HttpConfig {
-  return {
-    port: 0,
-    publicUrl: new URL(publicUrl),
-    authSecret: 'x'.repeat(32),
-    telegramBotToken: BOT_TOKEN,
-    telegramBotName: 'thinks_test_bot',
-    allowedRedirectUris: ['https://claude.ai/api/mcp/auth_callback'],
-    dataDir,
-    maxUploadBytes: 1024 * 1024,
-    devUserId: '',
-  }
+function config(publicUrl: string): ThinksHttpConfig {
+	return {
+		http: { port: 0, publicUrl: new URL(publicUrl), authSecret: SECRET, allowedRedirectUris: [] },
+		telegramBotToken: BOT_TOKEN,
+		telegramBotName: 'thinks_test_bot',
+		dataDir,
+		maxUploadBytes: 1024 * 1024,
+		buildHeapMb: 256,
+		devUserId: '',
+	}
 }
 
 beforeEach(async () => {
-  dataDir = mkdtempSync(join(tmpdir(), 'thinks-http-'))
-  users = new Users(dataDir)
-  builds = new Builds(users, dataDir, inProcess(users))
+	dataDir = mkdtempSync(join(tmpdir(), 'thinks-http-'))
+	users = new Users(dataDir)
+	builds = new Builds(users, dataDir, inProcess(users))
 
-  // Listen first: the app needs its public URL, and the port is known only now.
-  server = createHttpServer()
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-  server.on(
-    'request',
-    createApp({
-      cfg: config(base),
-      store: new AuthStore(join(dataDir, 'auth.db')),
-      users,
-      builds,
-      tokens: new Tokens('x'.repeat(32), base),
-    })
-  )
+	http = await startHttp((base) =>
+		createApp({ cfg: config(base), store: sqliteStore(join(dataDir, 'auth.db')), users, builds }),
+	)
 })
 
-afterEach(() => {
-  server.closeAllConnections()
-  server.close()
-})
+afterEach(() => http.close())
 
 function telegram(id: string, botToken = BOT_TOKEN) {
-  return signTelegramLogin(
-    {
-      id,
-      first_name: 'Ivan',
-      auth_date: String(Math.floor(Date.now() / 1000)),
-    },
-    botToken
-  )
+	return signTelegramLogin({ id, first_name: 'Ivan', auth_date: String(Math.floor(Date.now() / 1000)) }, botToken)
 }
 
-function register(redirect = REDIRECT) {
-  return fetch(`${base}/register`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      client_name: 'test',
-      redirect_uris: [redirect],
-      token_endpoint_auth_method: 'none',
-    }),
-  })
+/** What the widget does: append the signed login to the auth URL and follow it. */
+function widget(id: string, botToken = BOT_TOKEN) {
+	return (_page: string, callback: URL) => {
+		for (const [k, v] of Object.entries(telegram(id, botToken))) callback.searchParams.set(k, v)
+
+		return fetch(callback, { redirect: 'manual' })
+	}
 }
 
-/** The whole OAuth dance for a Telegram user. */
-async function authorize(userId: string, botToken = BOT_TOKEN) {
-  const { client_id } = (await (await register()).json()) as {
-    client_id: string
-  }
-  const verifier = randomBytes(32).toString('base64url')
-  const challenge = createHash('sha256').update(verifier).digest('base64url')
+async function connect(userId: string) {
+	const { tokens } = await oauthFlow({ base: http.base, login: widget(userId) })
 
-  const page = await fetch(
-    `${base}/authorize?` +
-      new URLSearchParams({
-        response_type: 'code',
-        client_id,
-        redirect_uri: REDIRECT,
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-        state: 'st',
-      })
-  ).then(r => r.text())
-  const authUrl = page
-    .match(/data-auth-url="([^"]+)"/)![1]!
-    .replace(/&amp;/g, '&')
-
-  // What the widget does: append the signed login to the auth URL.
-  const callback = new URL(authUrl)
-  for (const [k, v] of Object.entries(telegram(userId, botToken))) {
-    callback.searchParams.set(k, v)
-  }
-  const redirect = await fetch(callback, { redirect: 'manual' })
-  if (redirect.status !== 302) return { status: redirect.status }
-  const location = new URL(redirect.headers.get('location')!)
-  expect(location.searchParams.get('state')).toBe('st')
-  const code = location.searchParams.get('code')!
-
-  const exchange = () =>
-    fetch(`${base}/token`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        code_verifier: verifier,
-        client_id,
-        redirect_uri: REDIRECT,
-      }),
-    })
-  const first = await exchange()
-  const second = await exchange()
-  return {
-    status: first.status,
-    reuseStatus: second.status,
-    tokens: (await first.json()) as {
-      access_token: string
-      refresh_token: string
-    },
-  }
-}
-
-async function mcpClient(accessToken: string) {
-  const client = new Client({ name: 'test', version: '0.0.0' })
-  await client.connect(
-    new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
-      requestInit: { headers: { authorization: `Bearer ${accessToken}` } },
-    })
-  )
-  return client
+	return connectHttp(http.base, tokens.access_token)
 }
 
 function seedCorpus(userId: string) {
-  const dir = users.dir(userId)
-  mkdirSync(dir, { recursive: true })
-  const dumpPath = join(dir, 'seed.json')
-  writeFileSync(dumpPath, JSON.stringify(makeDump()))
-  buildCorpus({ ...users.config(userId), dumpPath })
+	const dir = users.dir(userId)
+
+	mkdirSync(dir, { recursive: true })
+
+	const dumpPath = join(dir, 'seed.json')
+
+	writeFileSync(dumpPath, JSON.stringify(makeDump()))
+	buildCorpus({ ...users.config(userId), dumpPath })
 }
 
-const textOf = (result: unknown): string =>
-  ((result as { content: { type: string; text: string }[] }).content ?? [])
-    .filter(c => c.type === 'text')
-    .map(c => c.text)
-    .join('\n')
-
-const brief = {
-  name: 'write_as_me',
-  arguments: { brief: 'напиши, что задержусь' },
-}
+const brief = { name: 'write_as_me', arguments: { brief: 'напиши, что задержусь' } }
 
 describe('OAuth', () => {
-  it('refuses to register a redirect outside the allowlist', async () => {
-    expect((await register('https://evil.example/cb')).status).toBe(400)
-    expect((await register(REDIRECT)).status).toBe(201)
-  })
+	it('issues tokens for a Telegram login, and a code works once', async () => {
+		const flow = await oauthFlow({ base: http.base, login: widget(OWNER) })
 
-  it('issues tokens for a Telegram login, and a code works once', async () => {
-    const result = await authorize(OWNER)
-    expect(result.status).toBe(200)
-    expect(result.reuseStatus).toBe(400)
-    expect(result.tokens?.access_token).toBeTruthy()
-  })
+		assert.ok(flow.tokens.access_token)
+		assert.equal((await flow.exchangeAgain()).status, 400)
+	})
 
-  it('refuses a login signed with another bot token', async () => {
-    expect((await authorize(OWNER, '999:forged')).status).toBe(400)
-  })
+	it('refuses a login signed with another bot token', async () => {
+		await assert.rejects(oauthFlow({ base: http.base, login: widget(OWNER, '999:forged') }))
+	})
 
-  it('answers /mcp without a token with 401 and the metadata pointer', async () => {
-    const res = await fetch(`${base}/mcp`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{}',
-    })
-    expect(res.status).toBe(401)
-    expect(res.headers.get('www-authenticate')).toContain(
-      'oauth-protected-resource'
-    )
-  })
+	it('keeps tokens issued before the kit valid', async () => {
+		// The old server signed the same claims with the same key and issuer.
+		const before = new Tokens({ secret: SECRET, issuer: new URL(http.base).href })
+		const token = await before.sign('access', { sub: OWNER, client_id: 'old-client' })
+
+		seedCorpus(OWNER)
+
+		const client = await connectHttp(http.base, token)
+
+		assert.ok(textOf(await client.callTool(brief)).includes('# ПРИМЕРЫ ИЗ АРХИВА'))
+	})
+})
+
+describe('auth.db written before the kit', () => {
+	it('keeps registered clients and drops the old pending codes', () => {
+		const path = join(dataDir, 'old-auth.db')
+		const db = new DatabaseSync(path)
+
+		db.prepare('CREATE TABLE client (client_id TEXT PRIMARY KEY, info TEXT NOT NULL)').run()
+
+		db.prepare(
+			`CREATE TABLE auth_code (code TEXT PRIMARY KEY, user_id TEXT NOT NULL, client_id TEXT NOT NULL,
+				challenge TEXT NOT NULL, redirect TEXT NOT NULL, expires_at INTEGER NOT NULL)`,
+		).run()
+
+		db.prepare('INSERT INTO client VALUES (?, ?)').run('c1', JSON.stringify({ client_id: 'c1', redirect_uris: [] }))
+		db.close()
+
+		migrateAuthDb(path)
+
+		const store = sqliteStore(path)
+
+		assert.equal(store.getClient('c1')?.client_id, 'c1')
+
+		const code = store.issueCode({
+			clientId: 'c1',
+			codeChallenge: 'x',
+			redirectUri: 'http://127.0.0.1/cb',
+			grant: 'g',
+		})
+
+		assert.equal(store.takeCode(code)?.grant, 'g')
+		store.close?.()
+	})
 })
 
 describe('MCP over HTTP', () => {
-  it("serves each user their own corpus and nobody else's", async () => {
-    seedCorpus(OWNER)
+	it("serves each user their own corpus and nobody else's", async () => {
+		seedCorpus(OWNER)
 
-    const owner = await mcpClient((await authorize(OWNER)).tokens!.access_token)
-    expect(textOf(await owner.callTool(brief))).toContain('# ПРИМЕРЫ ИЗ АРХИВА')
+		const owner = await connect(OWNER)
 
-    const stranger = await mcpClient(
-      (await authorize(STRANGER)).tokens!.access_token
-    )
-    expect(textOf(await stranger.callTool(brief))).toContain('Корпус не собран')
-  })
+		assert.ok(textOf(await owner.callTool(brief)).includes('# ПРИМЕРЫ ИЗ АРХИВА'))
+
+		const stranger = await connect(STRANGER)
+
+		assert.ok(textOf(await stranger.callTool(brief)).includes('Корпус не собран'))
+	})
 })
 
 describe('account', () => {
-  async function sessionCookie(userId: string) {
-    const url = new URL(`${base}/account/login`)
-    for (const [k, v] of Object.entries(telegram(userId))) {
-      url.searchParams.set(k, v)
-    }
-    const res = await fetch(url, { redirect: 'manual' })
-    expect(res.status).toBe(302)
-    return res.headers.get('set-cookie')!.split(';')[0]!
-  }
+	async function sessionCookie(userId: string) {
+		const url = new URL('/account/login', http.base)
 
-  const upload = (cookie: string, body: string, origin = base) =>
-    fetch(`${base}/account/upload`, {
-      method: 'PUT',
-      headers: { cookie, origin, 'content-type': 'application/octet-stream' },
-      body,
-    })
+		for (const [k, v] of Object.entries(telegram(userId))) url.searchParams.set(k, v)
 
-  it('builds a corpus from the uploaded export and deletes the export', async () => {
-    const cookie = await sessionCookie(OWNER)
-    expect((await upload(cookie, JSON.stringify(makeDump()))).status).toBe(202)
-    await builds.idle()
+		const res = await fetch(url, { redirect: 'manual' })
 
-    expect(builds.status(OWNER)?.state).toBe('ready')
-    expect(users.hasCorpus(OWNER)).toBe(true)
-    expect(existsSync(builds.dumpPath(OWNER))).toBe(false)
-  })
+		assert.equal(res.status, 302)
 
-  it("refuses someone else's export", async () => {
-    const cookie = await sessionCookie(STRANGER)
-    await upload(cookie, JSON.stringify(makeDump()))
-    await builds.idle()
+		return res.headers.get('set-cookie')?.split(';')[0] ?? ''
+	}
 
-    expect(builds.status(STRANGER)?.state).toBe('failed')
-    expect(users.hasCorpus(STRANGER)).toBe(false)
-  })
+	const upload = (cookie: string, body: string, origin = http.base) =>
+		fetch(`${http.base}/account/upload`, {
+			method: 'PUT',
+			headers: { cookie, origin, 'content-type': 'application/octet-stream' },
+			body,
+		})
 
-  it('refuses uploads from another origin', async () => {
-    const cookie = await sessionCookie(OWNER)
-    expect((await upload(cookie, '{}', 'https://evil.example')).status).toBe(
-      403
-    )
-  })
+	it('greets a logged-in user on the kit page with the page script', async () => {
+		const cookie = await sessionCookie(OWNER)
+		const page = await (await fetch(`${http.base}/account`, { headers: { cookie } })).text()
 
-  it('deletes everything the user has', async () => {
-    seedCorpus(OWNER)
-    const cookie = await sessionCookie(OWNER)
-    const res = await fetch(`${base}/account/delete`, {
-      method: 'POST',
-      headers: { cookie, origin: base },
-      redirect: 'manual',
-    })
-    expect(res.status).toBe(302)
-    expect(users.hasCorpus(OWNER)).toBe(false)
-  })
+		assert.match(page, /Привет, Ivan/)
+		assert.match(page, /<script src="\/account\.js" defer>/)
+		assert.equal((await fetch(`${http.base}/account.js`)).status, 200)
+	})
+
+	it('keeps the session cookie of the old server', async () => {
+		const before = new Tokens({ secret: SECRET, issuer: new URL(http.base).href })
+		const cookie = `thinks_session=${await before.sign('session', { sub: OWNER, name: 'Ivan' })}`
+		const page = await (await fetch(`${http.base}/account`, { headers: { cookie } })).text()
+
+		assert.match(page, /Привет, Ivan/)
+	})
+
+	it('builds a corpus from the uploaded export and deletes the export', async () => {
+		const cookie = await sessionCookie(OWNER)
+
+		assert.equal((await upload(cookie, JSON.stringify(makeDump()))).status, 202)
+		await builds.idle()
+
+		assert.equal(builds.status(OWNER)?.state, 'ready')
+		assert.equal(users.hasCorpus(OWNER), true)
+		assert.equal(existsSync(builds.dumpPath(OWNER)), false)
+	})
+
+	it("refuses someone else's export", async () => {
+		const cookie = await sessionCookie(STRANGER)
+
+		await upload(cookie, JSON.stringify(makeDump()))
+		await builds.idle()
+
+		assert.equal(builds.status(STRANGER)?.state, 'failed')
+		assert.equal(users.hasCorpus(STRANGER), false)
+	})
+
+	it('refuses uploads from another origin', async () => {
+		const cookie = await sessionCookie(OWNER)
+
+		assert.equal((await upload(cookie, '{}', 'https://evil.example')).status, 403)
+	})
+
+	it('deletes everything the user has', async () => {
+		seedCorpus(OWNER)
+
+		const cookie = await sessionCookie(OWNER)
+		const res = await fetch(`${http.base}/account/delete`, {
+			method: 'POST',
+			headers: { cookie, origin: http.base },
+			redirect: 'manual',
+		})
+
+		assert.equal(res.status, 302)
+		assert.equal(users.hasCorpus(OWNER), false)
+	})
 })
 
 describe('voice mode', () => {
-  it('sends the profile as instructions only while the switch is on', async () => {
-    seedCorpus(OWNER)
-    const token = (await authorize(OWNER)).tokens!.access_token
+	it('sends the profile as instructions only while the switch is on', async () => {
+		seedCorpus(OWNER)
 
-    expect((await mcpClient(token)).getInstructions()).toBeUndefined()
+		const { tokens } = await oauthFlow({ base: http.base, login: widget(OWNER) })
 
-    users.saveSettings(OWNER, { ...users.settings(OWNER), voice: true })
-    const instructions = (await mcpClient(token)).getInstructions()
-    expect(instructions).toContain('его же голосом')
-    expect(instructions).toContain('# Как я пишу')
-  })
+		assert.equal((await connectHttp(http.base, tokens.access_token)).getInstructions(), undefined)
 
-  it('offers the same text as a prompt for clients that drop instructions', async () => {
-    seedCorpus(OWNER)
-    const client = await mcpClient(
-      (await authorize(OWNER)).tokens!.access_token
-    )
-    const prompt = await client.getPrompt({ name: 'talk-like-me' })
-    const text = (prompt.messages[0]!.content as { text: string }).text
-    expect(text).toContain('# Как я пишу')
-  })
+		users.saveSettings(OWNER, { ...users.settings(OWNER), voice: true })
 
-  it('saves the switch from the account form', async () => {
-    const url = new URL(`${base}/account/login`)
-    for (const [k, v] of Object.entries(telegram(OWNER))) {
-      url.searchParams.set(k, v)
-    }
-    const login = await fetch(url, { redirect: 'manual' })
-    const cookie = login.headers.get('set-cookie')!.split(';')[0]!
+		const instructions = (await connectHttp(http.base, tokens.access_token)).getInstructions() ?? ''
 
-    const save = (body: string) =>
-      fetch(`${base}/account/settings`, {
-        method: 'POST',
-        headers: {
-          cookie,
-          origin: base,
-          'content-type': 'application/x-www-form-urlencoded',
-        },
-        body,
-        redirect: 'manual',
-      })
+		assert.ok(instructions.includes('его же голосом'))
+		assert.ok(instructions.includes('# Как я пишу'))
+	})
 
-    await save('neverMarks=&chatStopList=&recentYears=3&voice=1')
-    expect(users.settings(OWNER).voice).toBe(true)
-    // An unchecked box is simply absent from the form.
-    await save('neverMarks=&chatStopList=&recentYears=3')
-    expect(users.settings(OWNER).voice).toBe(false)
-  })
+	it('offers the same text as a prompt for clients that drop instructions', async () => {
+		seedCorpus(OWNER)
+
+		const client = await connect(OWNER)
+		const prompt = await client.getPrompt({ name: 'talk-like-me' })
+		const text = String((prompt.messages[0]?.content as { text?: string } | undefined)?.text)
+
+		assert.ok(text.includes('# Как я пишу'))
+	})
+
+	it('saves the switch from the account form', async () => {
+		const url = new URL('/account/login', http.base)
+
+		for (const [k, v] of Object.entries(telegram(OWNER))) url.searchParams.set(k, v)
+
+		const login = await fetch(url, { redirect: 'manual' })
+		const cookie = login.headers.get('set-cookie')?.split(';')[0] ?? ''
+		const save = (body: string) =>
+			fetch(`${http.base}/account/settings`, {
+				method: 'POST',
+				headers: { cookie, origin: http.base, 'content-type': 'application/x-www-form-urlencoded' },
+				body,
+				redirect: 'manual',
+			})
+
+		await save('neverMarks=&chatStopList=&recentYears=3&voice=1')
+		assert.equal(users.settings(OWNER).voice, true)
+		// An unchecked box is simply absent from the form.
+		await save('neverMarks=&chatStopList=&recentYears=3')
+		assert.equal(users.settings(OWNER).voice, false)
+	})
 })

@@ -1,21 +1,20 @@
 [tools]
-# node:sqlite ships a stable DatabaseSync with FTS5 from 24 on; the corpus and
-# the whole search layer are built on it, so this is a hard floor, not a
-# preference. Verified: the full test suite passes on 24.18.0.
-node = "24"
+# node:sqlite with FTS5 carries the corpus and the whole search layer, and the
+# kit is built for Node 26, so this is a floor, not a preference.
+node = "26.11.1"
 
 [tasks.corpus]
 description = "Собрать корпус из выгрузки Telegram: mise run corpus <dump.json>"
-run = "node --max-old-space-size=8192 build/index.js build"
+run = "npm run corpus --"
 
 [tasks.profile]
 description = "Напечатать стиль-профиль (dm | group | longform | code | jsdoc)"
-run = "node build/index.js profile"
+run = "npm run profile --"
 
 [tasks.where]
 description = "Показать, где лежит корпус"
-run = "node build/index.js where"
+run = "npm run where"
 
 [tasks.check]
-description = "Типы, форматирование и тесты"
-run = ["npm run typecheck", "npm run format:check", "npm run test"]
+description = "Форматирование, линтер, типы и тесты"
+run = ["npm run format:check", "npm run lint", "npm run typecheck", "npm test"]

@@ -1,19 +1,20 @@
 import { existsSync } from 'node:fs'
-import type { Config } from '../config.js'
-import { openDb, type Db } from '../store/db.js'
-import { loadProfile, type StyleProfile } from '../style/profile.js'
+
+import type { Config } from '#thinks/config'
+import { openDb, type Db } from '#thinks/store/db'
+import { loadProfile, type StyleProfile } from '#thinks/style/profile'
 
 /** Everything a tool needs once the corpus exists. */
-export interface Corpus {
-  db: Db
-  profile: StyleProfile
+export type Corpus = {
+	db: Db
+	profile: StyleProfile
 }
 
 export const CORPUS_MISSING =
-  'Корпус не собран, поэтому отвечать твоим голосом пока не из чего.\n' +
-  'Выгрузи архив Telegram (Settings > Advanced > Export Telegram data, JSON) ' +
-  'и запусти:\n\n  thinks-mcp build <путь к result.json>\n\n' +
-  'Пересобирать сервер после этого не нужно -- он подхватит корпус сам.'
+	'Корпус не собран, поэтому отвечать твоим голосом пока не из чего.\n' +
+	'Выгрузи архив Telegram (Settings > Advanced > Export Telegram data, JSON) ' +
+	'и запусти:\n\n  thinks-mcp build <путь к result.json>\n\n' +
+	'Пересобирать сервер после этого не нужно -- он подхватит корпус сам.'
 
 /**
  * Lazy handle on the corpus.
@@ -25,36 +26,44 @@ export const CORPUS_MISSING =
  * the next tool call picks it up, no restart.
  */
 export class CorpusRef {
-  private corpus: Corpus | null = null
+	private corpus: Corpus | null = null
 
-  constructor(private readonly cfg: Config) {}
+	private readonly cfg: Config
 
-  get(): Corpus | null {
-    if (this.corpus) return this.corpus
-    if (!existsSync(this.cfg.dbPath)) return null
+	constructor(cfg: Config) {
+		this.cfg = cfg
+	}
 
-    const db = openDb(this.cfg.dbPath)
-    const profile = loadProfile(db)
-    if (!profile) {
-      db.close()
-      return null
-    }
+	get(): Corpus | null {
+		if (this.corpus) return this.corpus
 
-    this.corpus = {
-      db,
-      profile: { ...profile, neverMarks: this.cfg.neverMarks },
-    }
-    return this.corpus
-  }
+		if (!existsSync(this.cfg.dbPath)) return null
 
-  close(): void {
-    this.corpus?.db.close()
-    this.corpus = null
-  }
+		const db = openDb(this.cfg.dbPath)
+		const profile = loadProfile(db)
+
+		if (!profile) {
+			db.close()
+
+			return null
+		}
+
+		this.corpus = {
+			db,
+			profile: { ...profile, neverMarks: this.cfg.neverMarks },
+		}
+
+		return this.corpus
+	}
+
+	close(): void {
+		this.corpus?.db.close()
+		this.corpus = null
+	}
 }
 
 /** Shared dependencies passed to every tool's register function. */
-export interface ToolContext {
-  cfg: Config
-  corpus: CorpusRef
+export type ToolContext = {
+	cfg: Config
+	corpus: CorpusRef
 }

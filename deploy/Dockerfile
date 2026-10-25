@@ -1,15 +1,14 @@
 # Hosted connector: `thinks-mcp serve --http`. Build context is the repo root.
 
-FROM node:24.18.0-alpine AS build
+FROM node:26.11.1-alpine AS build
 WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml .npmrc ./
-RUN pnpm install --frozen-lockfile
-COPY tsconfig.json ./
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-RUN pnpm build && pnpm prune --prod
+RUN npm run build && npm prune --omit=dev
 
-FROM node:24.18.0-alpine
+FROM node:26.11.1-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/package.json ./

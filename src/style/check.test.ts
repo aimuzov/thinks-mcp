@@ -1,458 +1,486 @@
-import { describe, expect, it } from 'vitest'
-import { checkText, codeOverlap } from './check.js'
-import type { StyleProfile } from './profile.js'
-import type { RegisterMetrics } from './metrics.js'
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+
+import { checkText, codeOverlap } from './check.ts'
+import type { RegisterMetrics } from './metrics.ts'
+import type { StyleProfile } from './profile.ts'
 
 const dm: RegisterMetrics = {
-  turns: 1000,
-  messages: 1600,
-  messageLength: {
-    count: 1600,
-    mean: 35,
-    p25: 9,
-    median: 18,
-    p75: 32,
-    p90: 52,
-    max: 900,
-  },
-  turnLength: {
-    count: 1000,
-    mean: 50,
-    p25: 12,
-    median: 25,
-    p75: 55,
-    p90: 94,
-    max: 1200,
-  },
-  punctuation: {
-    startsCapital: 0.984,
-    endsPeriod: 0.649,
-    endsQuestion: 0.193,
-    endsExclamation: 0.015,
-    endsParen: 0.05,
-    endsNothing: 0.092,
-    hasQuestion: 0.21,
-    hasExclamation: 0.022,
-    hasEllipsis: 0.012,
-    hasDash: 0.01,
-  },
-  bursts: {
-    single: 0.631,
-    double: 0.233,
-    triple: 0.083,
-    more: 0.053,
-    messagesInBursts: 0.605,
-    meanParts: 1.6,
-  },
-  emoji: [
-    { char: '🙂', count: 7640 },
-    { char: 'ツ', count: 639 },
-    { char: '😄', count: 607 },
-  ],
+	turns: 1000,
+	messages: 1600,
+	messageLength: {
+		count: 1600,
+		mean: 35,
+		p25: 9,
+		median: 18,
+		p75: 32,
+		p90: 52,
+		max: 900,
+	},
+	turnLength: {
+		count: 1000,
+		mean: 50,
+		p25: 12,
+		median: 25,
+		p75: 55,
+		p90: 94,
+		max: 1200,
+	},
+	punctuation: {
+		startsCapital: 0.984,
+		endsPeriod: 0.649,
+		endsQuestion: 0.193,
+		endsExclamation: 0.015,
+		endsParen: 0.05,
+		endsNothing: 0.092,
+		hasQuestion: 0.21,
+		hasExclamation: 0.022,
+		hasEllipsis: 0.012,
+		hasDash: 0.01,
+	},
+	bursts: {
+		single: 0.631,
+		double: 0.233,
+		triple: 0.083,
+		more: 0.053,
+		messagesInBursts: 0.605,
+		meanParts: 1.6,
+	},
+	emoji: [
+		{ char: '🙂', count: 7640 },
+		{ char: 'ツ', count: 639 },
+		{ char: '😄', count: 607 },
+	],
 }
 
 const profile: StyleProfile = {
-  builtAt: '2026-08-11T00:00:00.000Z',
-  registers: { dm, group: dm, longform: dm },
-  recent: {},
-  recentFrom: 0,
-  markers: [],
-  antiPatterns: [
-    { label: 'списки через дефис', hits: 80, share: 0.05 },
-    { label: 'нумерованные списки', hits: 30, share: 0.019 },
-    { label: 'markdown-жирный **', hits: 8, share: 0.005 },
-  ],
+	builtAt: '2026-08-11T00:00:00.000Z',
+	registers: { dm, group: dm, longform: dm },
+	recent: {},
+	recentFrom: 0,
+	markers: [],
+	antiPatterns: [
+		{ label: 'списки через дефис', hits: 80, share: 0.05 },
+		{ label: 'нумерованные списки', hits: 30, share: 0.019 },
+		{ label: 'markdown-жирный **', hits: 8, share: 0.005 },
+	],
 }
 
 const check = (text: string) => checkText(text, profile)
-const issues = (text: string) => check(text).findings.map(f => f.issue)
+const issues = (text: string) => check(text).findings.map((f) => f.issue)
 
 describe('checkText', () => {
-  it('passes a message written the way the profile describes', () => {
-    const report = check('Через час буду.\nМожет раньше.')
-    expect(report.findings).toEqual([])
-    expect(report.score).toBe(100)
-  })
+	it('passes a message written the way the profile describes', () => {
+		const report = check('Через час буду.\nМожет раньше.')
 
-  it('flags a message far over the length ceiling', () => {
-    const report = check('А'.repeat(400))
-    expect(issues('А'.repeat(400))).toContain(
-      'Сообщение длиннее, чем я обычно пишу'
-    )
-    expect(report.score).toBeLessThan(70)
-  })
+		assert.deepEqual(report.findings, [])
+		assert.equal(report.score, 100)
+	})
 
-  it('flags bullet lists and markdown', () => {
-    const found = issues('Смотри:\n- первое\n- второе\nи **важное**')
-    expect(found).toContain('Список -- я так не пишу')
-    expect(found).toContain('Markdown-разметка')
-  })
+	it('flags a message far over the length ceiling', () => {
+		const report = check('А'.repeat(400))
 
-  it('lets lists through for an author who writes them', () => {
-    const listy: StyleProfile = {
-      ...profile,
-      antiPatterns: [{ label: 'списки через дефис', hits: 5000, share: 3.1 }],
-    }
-    const found = checkText('Смотри:\n- первое\n- второе', listy).findings
-    expect(found.map(f => f.issue)).not.toContain('Список -- я так не пишу')
-  })
+		assert.ok(issues('А'.repeat(400)).includes('Сообщение длиннее, чем я обычно пишу'))
+		assert.ok(report.score < 70)
+	})
 
-  it('does not assert formatting habits that were never measured', () => {
-    const unmeasured: StyleProfile = { ...profile, antiPatterns: [] }
-    const found = checkText('- первое\n**второе**', unmeasured).findings
-    expect(found.map(f => f.issue)).not.toContain('Список -- я так не пишу')
-    expect(found.map(f => f.issue)).not.toContain('Markdown-разметка')
-  })
+	it('flags bullet lists and markdown', () => {
+		const found = issues('Смотри:\n- первое\n- второе\nи **важное**')
 
-  it('flags clerical language with the offending fragment', () => {
-    const report = check('Однако решение принято.')
-    const clerical = report.findings.find(f => f.issue === 'Канцелярит')
-    expect(clerical?.fragment?.toLowerCase()).toBe('однако')
-  })
+		assert.ok(found.includes('Список -- я так не пишу'))
+		assert.ok(found.includes('Markdown-разметка'))
+	})
 
-  it('flags emoji outside the palette', () => {
-    expect(issues('Готово 👍')).toContain('Эмодзи не из моей палитры')
-    expect(issues('Готово 🙂')).not.toContain('Эмодзи не из моей палитры')
-  })
+	it('lets lists through for an author who writes them', () => {
+		const listy: StyleProfile = {
+			...profile,
+			antiPatterns: [{ label: 'списки через дефис', hits: 5000, share: 3.1 }],
+		}
+		const found = checkText('Смотри:\n- первое\n- второе', listy).findings
 
-  it('flags a wall of exclamation marks', () => {
-    expect(issues('Ура!\nОтлично!\nСупер!')).toContain(
-      'Слишком много восклицательных знаков'
-    )
-  })
+		assert.ok(!found.map((f) => f.issue).includes('Список -- я так не пишу'))
+	})
 
-  it('flags lowercase openings when the owner capitalises', () => {
-    expect(issues('привет.\nкак дела.')).toContain(
-      'Сообщения начинаются со строчной буквы'
-    )
-  })
+	it('does not assert formatting habits that were never measured', () => {
+		const unmeasured: StyleProfile = { ...profile, antiPatterns: [] }
+		const found = checkText('- первое\n**второе**', unmeasured).findings
 
-  it('never scores outside 0..100', () => {
-    const awful = check(
-      ['Однако'.repeat(200), '- список', '**жирный**', 'Ура! 👍😍🎉'].join('\n')
-    )
-    expect(awful.score).toBeGreaterThanOrEqual(0)
-    expect(awful.score).toBeLessThanOrEqual(100)
-  })
+		assert.ok(!found.map((f) => f.issue).includes('Список -- я так не пишу'))
+		assert.ok(!found.map((f) => f.issue).includes('Markdown-разметка'))
+	})
 
-  it('reports nothing to check for empty input', () => {
-    expect(check('   ').score).toBe(0)
-    expect(check('   ').verdict).toBe('Проверять нечего.')
-  })
+	it('flags clerical language with the offending fragment', () => {
+		const report = check('Однако решение принято.')
+		const clerical = report.findings.find((f) => f.issue === 'Канцелярит')
+
+		assert.equal(clerical?.fragment?.toLowerCase(), 'однако')
+	})
+
+	it('flags emoji outside the palette', () => {
+		assert.ok(issues('Готово 👍').includes('Эмодзи не из моей палитры'))
+		assert.ok(!issues('Готово 🙂').includes('Эмодзи не из моей палитры'))
+	})
+
+	it('flags a wall of exclamation marks', () => {
+		assert.ok(issues('Ура!\nОтлично!\nСупер!').includes('Слишком много восклицательных знаков'))
+	})
+
+	it('flags lowercase openings when the owner capitalises', () => {
+		assert.ok(issues('привет.\nкак дела.').includes('Сообщения начинаются со строчной буквы'))
+	})
+
+	it('never scores outside 0..100', () => {
+		const awful = check(['Однако'.repeat(200), '- список', '**жирный**', 'Ура! 👍😍🎉'].join('\n'))
+
+		assert.ok(awful.score >= 0)
+		assert.ok(awful.score <= 100)
+	})
+
+	it('reports nothing to check for empty input', () => {
+		assert.equal(check('   ').score, 0)
+		assert.equal(check('   ').verdict, 'Проверять нечего.')
+	})
 })
 
 const typed = (shares: Record<string, number>): StyleProfile => ({
-  ...profile,
-  typography: Object.entries(shares).map(([label, share]) => ({
-    label,
-    hits: 1,
-    share,
-  })),
+	...profile,
+	typography: Object.entries(shares).map(([label, share]) => ({
+		label,
+		hits: 1,
+		share,
+	})),
 })
 
 describe('checkText on typography', () => {
-  it('flags a mark the archive almost never carries', () => {
-    const found = checkText(
-      'Плов — пусть готовит.',
-      typed({ 'длинное тире —': 1.1 }),
-      'dm'
-    ).findings
-    expect(found.map(f => f.issue)).toContain('Знак не из моего набора')
-    expect(found[0].fragment).toBe('—')
-    expect(found[0].detail).toContain('1.1%')
-  })
+	it('flags a mark the archive almost never carries', () => {
+		const found = checkText('Плов — пусть готовит.', typed({ 'длинное тире —': 1.1 }), 'dm').findings
 
-  it('lets a mark through for an author who types it', () => {
-    const found = checkText(
-      'Плов — пусть готовит.',
-      typed({ 'длинное тире —': 4.3 }),
-      'dm'
-    ).findings
-    expect(found.map(f => f.issue)).not.toContain('Знак не из моего набора')
-  })
+		assert.ok(found.map((f) => f.issue).includes('Знак не из моего набора'))
+		assert.equal(found[0].fragment, '—')
+		assert.ok(found[0].detail.includes('1.1%'))
+	})
 
-  it('says nothing about marks that were never measured', () => {
-    const found = checkText('Он сказал «нет» — и ушёл.', profile, 'dm').findings
-    expect(found.map(f => f.issue)).not.toContain('Знак не из моего набора')
-  })
+	it('lets a mark through for an author who types it', () => {
+		const found = checkText('Плов — пусть готовит.', typed({ 'длинное тире —': 4.3 }), 'dm').findings
 
-  it('holds a declared mark against a text whatever the archive says', () => {
-    const declared: StyleProfile = {
-      ...typed({ 'длинное тире —': 4.3 }),
-      neverMarks: [{ mark: '—', standIn: '--' }],
-    }
-    const found = checkText('Плов — пусть готовит.', declared, 'dm').findings
-    expect(found).toEqual([
-      {
-        issue: 'Знак, который я не набираю',
-        fragment: 'Плов — пусть',
-        detail: 'пиши `--` вместо —',
-        penalty: 15,
-      },
-    ])
-  })
+		assert.ok(!found.map((f) => f.issue).includes('Знак не из моего набора'))
+	})
 
-  it('does not charge twice for a mark both declared and measured', () => {
-    const both: StyleProfile = {
-      ...typed({ 'длинное тире —': 1.1, 'многоточие одним знаком …': 0.2 }),
-      neverMarks: [{ mark: '—', standIn: '--' }],
-    }
-    const found = checkText('Плов — пусть… готовит.', both, 'dm').findings
-    expect(found.map(f => [f.issue, f.fragment])).toEqual([
-      ['Знак, который я не набираю', 'Плов — пусть…'],
-      ['Знак не из моего набора', '…'],
-    ])
-  })
+	it('says nothing about marks that were never measured', () => {
+		const found = checkText('Он сказал «нет» — и ушёл.', profile, 'dm').findings
 
-  it('holds each guillemet against a text as its own declared mark', () => {
-    const quoted: StyleProfile = {
-      ...profile,
-      neverMarks: [
-        { mark: '«', standIn: '"' },
-        { mark: '»', standIn: '"' },
-      ],
-    }
-    const found = checkText('Он сказал «нет» и ушёл.', quoted, 'dm').findings
-    expect(found.map(f => [f.fragment, f.detail])).toEqual([
-      ['сказал «нет» и', 'пиши `"` вместо «'],
-      ['сказал «нет» и', 'пиши `"` вместо »'],
-    ])
-  })
+		assert.ok(!found.map((f) => f.issue).includes('Знак не из моего набора'))
+	})
 
-  it('names a declared mark without a stand-in plainly', () => {
-    const bare: StyleProfile = {
-      ...profile,
-      neverMarks: [{ mark: '→', standIn: '' }],
-    }
-    const [finding] = checkText('Туда → сюда.', bare, 'dm').findings
-    expect(finding.detail).toBe('→ не ставлю')
-  })
+	it('holds a declared mark against a text whatever the archive says', () => {
+		const declared: StyleProfile = {
+			...typed({ 'длинное тире —': 4.3 }),
+			neverMarks: [{ mark: '—', standIn: '--' }],
+		}
+		const found = checkText('Плов — пусть готовит.', declared, 'dm').findings
 
-  it('never holds the double hyphen against a text', () => {
-    const found = checkText(
-      'Пишу так -- и всё.',
-      typed({ 'двойной дефис --': 0 }),
-      'dm'
-    ).findings
-    expect(found.map(f => f.issue)).not.toContain('Знак не из моего набора')
-  })
+		assert.deepEqual(found, [
+			{
+				issue: 'Знак, который я не набираю',
+				fragment: 'Плов — пусть',
+				detail: 'пиши `--` вместо —',
+				penalty: 15,
+			},
+		])
+	})
+
+	it('does not charge twice for a mark both declared and measured', () => {
+		const both: StyleProfile = {
+			...typed({ 'длинное тире —': 1.1, 'многоточие одним знаком …': 0.2 }),
+			neverMarks: [{ mark: '—', standIn: '--' }],
+		}
+		const found = checkText('Плов — пусть… готовит.', both, 'dm').findings
+
+		assert.deepEqual(
+			found.map((f) => [f.issue, f.fragment]),
+			[
+				['Знак, который я не набираю', 'Плов — пусть…'],
+				['Знак не из моего набора', '…'],
+			],
+		)
+	})
+
+	it('holds each guillemet against a text as its own declared mark', () => {
+		const quoted: StyleProfile = {
+			...profile,
+			neverMarks: [
+				{ mark: '«', standIn: '"' },
+				{ mark: '»', standIn: '"' },
+			],
+		}
+		const found = checkText('Он сказал «нет» и ушёл.', quoted, 'dm').findings
+
+		assert.deepEqual(
+			found.map((f) => [f.fragment, f.detail]),
+			[
+				['сказал «нет» и', 'пиши `"` вместо «'],
+				['сказал «нет» и', 'пиши `"` вместо »'],
+			],
+		)
+	})
+
+	it('names a declared mark without a stand-in plainly', () => {
+		const bare: StyleProfile = {
+			...profile,
+			neverMarks: [{ mark: '→', standIn: '' }],
+		}
+		const [finding] = checkText('Туда → сюда.', bare, 'dm').findings
+
+		assert.equal(finding.detail, '→ не ставлю')
+	})
+
+	it('never holds the double hyphen against a text', () => {
+		const found = checkText('Пишу так -- и всё.', typed({ 'двойной дефис --': 0 }), 'dm').findings
+
+		assert.ok(!found.map((f) => f.issue).includes('Знак не из моего набора'))
+	})
 })
 
 const withCode: StyleProfile = {
-  ...profile,
-  code: {
-    blocks: 100,
-    lines: 200,
-    genres: {
-      code: {
-        blocks: 60,
-        lineWidth: { median: 63, p75: 75, p90: 87, max: 120 },
-        blockLines: { median: 1, medianMulti: 3, p90: 5, oneLiners: 0.6 },
-        russian: 0.77,
-      },
-      jsdoc: {
-        blocks: 40,
-        lineWidth: { median: 60, p75: 72, p90: 84, max: 110 },
-        blockLines: { median: 3, medianMulti: 4, p90: 9, oneLiners: 0.1 },
-        russian: 0.8,
-      },
-    },
-    inline: 60,
-    doc: 40,
-    russian: 0.77,
-    markers: [
-      { name: 'TODO', count: 30, share: 0.3 },
-      { name: 'NOTE', count: 5, share: 0.05 },
-      { name: 'FIXME', count: 1, share: 0.01 },
-    ],
-    connectives: [],
-    repos: [],
-  },
+	...profile,
+	code: {
+		blocks: 100,
+		lines: 200,
+		genres: {
+			code: {
+				blocks: 60,
+				lineWidth: { median: 63, p75: 75, p90: 87, max: 120 },
+				blockLines: { median: 1, medianMulti: 3, p90: 5, oneLiners: 0.6 },
+				russian: 0.77,
+			},
+			jsdoc: {
+				blocks: 40,
+				lineWidth: { median: 60, p75: 72, p90: 84, max: 110 },
+				blockLines: { median: 3, medianMulti: 4, p90: 9, oneLiners: 0.1 },
+				russian: 0.8,
+			},
+		},
+		inline: 60,
+		doc: 40,
+		russian: 0.77,
+		markers: [
+			{ name: 'TODO', count: 30, share: 0.3 },
+			{ name: 'NOTE', count: 5, share: 0.05 },
+			{ name: 'FIXME', count: 1, share: 0.01 },
+		],
+		connectives: [],
+		repos: [],
+	},
 }
 
-const checkCode = (text: string, register: 'code' | 'jsdoc' = 'code') =>
-  checkText(text, withCode, register)
+const checkCode = (text: string, register: 'code' | 'jsdoc' = 'code') => checkText(text, withCode, register)
 
 describe('checkText for comments', () => {
-  it('accepts a comment that follows the measured shape', () => {
-    const report = checkCode('// Так сделано потому что иначе ломается сборка.')
-    expect(report.findings).toEqual([])
-    expect(report.score).toBe(100)
-  })
+	it('accepts a comment that follows the measured shape', () => {
+		const report = checkCode('// Так сделано потому что иначе ломается сборка.')
 
-  it('measures width without the comment marker', () => {
-    // 84 characters of text: under the 87 ceiling once `// ` is stripped, over
-    // it if the marker were counted.
-    expect(checkCode(`// ${'а'.repeat(84)}`).findings).toEqual([])
-    expect(
-      checkCode(`// ${'а'.repeat(100)}`).findings.map(f => f.issue)
-    ).toContain('Строка шире, чем я обычно пишу')
-  })
+		assert.deepEqual(report.findings, [])
+		assert.equal(report.score, 100)
+	})
 
-  it('flags markers the corpus does not rely on', () => {
-    const found = checkCode('// FIXME: почини').findings
-    expect(found.map(f => f.issue)).toContain('Чужой маркер')
-    expect(found[0].detail).toBe('я использую только TODO, NOTE')
-    expect(checkCode('// XXX: почини').findings.map(f => f.issue)).toContain(
-      'Чужой маркер'
-    )
-    expect(checkCode('// TODO: доделать').findings).toEqual([])
-  })
+	it('measures width without the comment marker', () => {
+		// 84 characters of text: under the 87 ceiling once `// ` is stripped, over
+		// it if the marker were counted.
+		assert.deepEqual(checkCode(`// ${'а'.repeat(84)}`).findings, [])
 
-  it('stays quiet about markers when the corpus has none', () => {
-    const noMarkers: StyleProfile = {
-      ...withCode,
-      code: { ...withCode.code!, markers: [] },
-    }
-    expect(checkText('// FIXME: почини', noMarkers, 'code').findings).toEqual(
-      []
-    )
-  })
+		assert.ok(
+			checkCode(`// ${'а'.repeat(100)}`)
+				.findings.map((f) => f.issue)
+				.includes('Строка шире, чем я обычно пишу'),
+		)
+	})
 
-  it('flags водянистые announcements', () => {
-    const found = checkCode('// Этот метод отвечает за обработку данных.')
-    expect(found.findings.map(f => f.issue)).toContain('Вода вместо факта')
-  })
+	it('flags markers the corpus does not rely on', () => {
+		const found = checkCode('// FIXME: почини').findings
 
-  it('flags a type in braces inside jsdoc', () => {
-    const found = checkCode(
-      ['/**', ' * Что-то.', ' * @param {string} name - Имя.', ' */'].join('\n'),
-      'jsdoc'
-    )
-    expect(found.findings.map(f => f.issue)).toContain('Тип в фигурных скобках')
-  })
+		assert.ok(found.map((f) => f.issue).includes('Чужой маркер'))
+		assert.equal(found[0].detail, 'я использую только TODO, NOTE')
 
-  it('uses the jsdoc block budget, not the inline one', () => {
-    // Seven lines: normal for a docblock (p90 = 9), too long for an inline
-    // note (p90 = 5).
-    const seven = [
-      '/**',
-      ' * Раз.',
-      ' * Два.',
-      ' * Три.',
-      ' * Четыре.',
-      ' * Пять.',
-      ' * Шесть.',
-      ' * Семь.',
-      ' */',
-    ].join('\n')
-    expect(checkCode(seven, 'jsdoc').findings).toEqual([])
-    expect(checkCode(seven, 'code').findings.map(f => f.issue)).toContain(
-      'Блок длиннее обычного'
-    )
-  })
+		assert.ok(
+			checkCode('// XXX: почини')
+				.findings.map((f) => f.issue)
+				.includes('Чужой маркер'),
+		)
 
-  it('flags emoji, which never appear in the code corpus', () => {
-    expect(checkCode('// Готово 🙂').findings.map(f => f.issue)).toContain(
-      'Эмодзи в комментарии'
-    )
-  })
+		assert.deepEqual(checkCode('// TODO: доделать').findings, [])
+	})
 
-  it('catches a comment that restates the code under it', () => {
-    const restating = checkText(
-      '// set retry timeout',
-      withCode,
-      'code',
-      'function setRetryTimeout(retry, timeout) {'
-    )
-    expect(restating.findings.map(f => f.issue)).toContain('Пересказ кода')
+	it('stays quiet about markers when the corpus has none', () => {
+		const noMarkers: StyleProfile = {
+			...withCode,
+			code: { ...withCode.code!, markers: [] },
+		}
 
-    const explaining = checkText(
-      '// Иначе поздний ответ перезапишет свежий.',
-      withCode,
-      'code',
-      'const retryTimeout = DEFAULT_RETRY_TIMEOUT'
-    )
-    expect(explaining.findings.map(f => f.issue)).not.toContain('Пересказ кода')
-  })
+		assert.deepEqual(checkText('// FIXME: почини', noMarkers, 'code').findings, [])
+	})
 
-  it('splits identifiers before comparing, so camelCase counts', () => {
-    expect(codeOverlap('cache retry', 'const cacheRetry = 1')).toBe(1)
-  })
+	it('flags водянистые announcements', () => {
+		const found = checkCode('// Этот метод отвечает за обработку данных.')
 
-  it('keeps UPPER_CASE constants whole', () => {
-    // Splitting before every capital would turn DEFAULT_TIMEOUT into single
-    // letters and drop both words from the comparison.
-    expect(codeOverlap('default timeout', 'x = DEFAULT_TIMEOUT')).toBe(1)
-  })
+		assert.ok(found.findings.map((f) => f.issue).includes('Вода вместо факта'))
+	})
 
-  it('scores zero when comment and code are in different languages', () => {
-    // The limitation is real and worth pinning: a Russian comment over English
-    // identifiers cannot be judged by word overlap, so the detector stays quiet
-    // rather than pretending.
-    expect(codeOverlap('Кеш и ретрай', 'const cacheRetry = 1')).toBe(0)
-    expect(
-      checkText(
-        '// Определяем платформу и возвращаем платформу.',
-        withCode,
-        'code',
-        'function detectPlatform(): Platform {'
-      ).findings.map(f => f.issue)
-    ).not.toContain('Пересказ кода')
-  })
+	it('flags a type in braces inside jsdoc', () => {
+		const found = checkCode(['/**', ' * Что-то.', ' * @param {string} name - Имя.', ' */'].join('\n'), 'jsdoc')
 
-  it('ignores the code argument for chat registers', () => {
-    const report = checkText('Буду.', profile, 'dm', 'const a = 1')
-    expect(report.findings).toEqual([])
-  })
+		assert.ok(found.findings.map((f) => f.issue).includes('Тип в фигурных скобках'))
+	})
 
-  it('says so when the code corpus has not been built', () => {
-    const report = checkText('// Что угодно.', profile, 'code')
-    expect(report.verdict).toBe('Корпус кода не собран.')
-  })
+	it('uses the jsdoc block budget, not the inline one', () => {
+		// Seven lines: normal for a docblock (p90 = 9), too long for an inline
+		// note (p90 = 5).
+		const seven = [
+			'/**',
+			' * Раз.',
+			' * Два.',
+			' * Три.',
+			' * Четыре.',
+			' * Пять.',
+			' * Шесть.',
+			' * Семь.',
+			' */',
+		].join('\n')
 
-  it('takes typography from the code corpus, not from the chat one', () => {
-    // The archive's messages hold no `«»` and its comments hold no dash: each
-    // register answers for itself, or the chat numbers would ban a dash the
-    // author does write in code.
-    const mixed: StyleProfile = {
-      ...withCode,
-      typography: [{ label: 'длинное тире —', hits: 1, share: 1.1 }],
-      code: {
-        ...withCode.code!,
-        typography: {
-          jsdoc: [
-            { label: 'кавычки-ёлочки «»', hits: 0, share: 0 },
-            { label: 'длинное тире —', hits: 300, share: 4.3 },
-          ],
-        },
-      },
-    }
+		assert.deepEqual(checkCode(seven, 'jsdoc').findings, [])
 
-    const doc = ['/**', ' * Ставлю «ёлочки» — и тире.', ' */'].join('\n')
-    const found = checkText(doc, mixed, 'jsdoc').findings
-    const marks = found.filter(f => f.issue === 'Знак не из моего набора')
-    expect(marks.map(f => f.fragment)).toEqual(['«'])
-  })
+		assert.ok(
+			checkCode(seven, 'code')
+				.findings.map((f) => f.issue)
+				.includes('Блок длиннее обычного'),
+		)
+	})
 
-  it('holds declared marks against a comment even where the archive has them', () => {
-    // The archive's handwritten comments do carry `—`, yet the owner says they
-    // never type it: the declaration wins over a share of 4.3%.
-    const declared: StyleProfile = {
-      ...withCode,
-      neverMarks: [
-        { mark: '…', standIn: '...' },
-        { mark: '—', standIn: '--' },
-        { mark: '→', standIn: '=>' },
-      ],
-      code: {
-        ...withCode.code!,
-        typography: {
-          jsdoc: [{ label: 'длинное тире —', hits: 300, share: 4.3 }],
-        },
-      },
-    }
+	it('flags emoji, which never appear in the code corpus', () => {
+		assert.ok(
+			checkCode('// Готово 🙂')
+				.findings.map((f) => f.issue)
+				.includes('Эмодзи в комментарии'),
+		)
+	})
 
-    const doc = [
-      'директория — это Section1, файл — Section2,',
-      'глубже идут Section3…6. Тег → тесты.',
-    ].join('\n')
-    const report = checkText(doc, declared, 'jsdoc', 'const TAGGED_DEPTH = 2')
-    expect(report.findings.map(f => [f.fragment, f.detail])).toEqual([
-      ['идут Section3…6. Тег', 'пиши `...` вместо …'],
-      ['директория — это', 'пиши `--` вместо —'],
-      ['Тег → тесты.', 'пиши `=>` вместо →'],
-    ])
-    expect(report.score).toBe(55)
-  })
+	it('catches a comment that restates the code under it', () => {
+		const restating = checkText(
+			'// set retry timeout',
+			withCode,
+			'code',
+			'function setRetryTimeout(retry, timeout) {',
+		)
+
+		assert.ok(restating.findings.map((f) => f.issue).includes('Пересказ кода'))
+
+		const explaining = checkText(
+			'// Иначе поздний ответ перезапишет свежий.',
+			withCode,
+			'code',
+			'const retryTimeout = DEFAULT_RETRY_TIMEOUT',
+		)
+
+		assert.ok(!explaining.findings.map((f) => f.issue).includes('Пересказ кода'))
+	})
+
+	it('splits identifiers before comparing, so camelCase counts', () => {
+		assert.equal(codeOverlap('cache retry', 'const cacheRetry = 1'), 1)
+	})
+
+	it('keeps UPPER_CASE constants whole', () => {
+		// Splitting before every capital would turn DEFAULT_TIMEOUT into single
+		// letters and drop both words from the comparison.
+		assert.equal(codeOverlap('default timeout', 'x = DEFAULT_TIMEOUT'), 1)
+	})
+
+	it('scores zero when comment and code are in different languages', () => {
+		// The limitation is real and worth pinning: a Russian comment over English
+		// identifiers cannot be judged by word overlap, so the detector stays quiet
+		// rather than pretending.
+		assert.equal(codeOverlap('Кеш и ретрай', 'const cacheRetry = 1'), 0)
+
+		assert.ok(
+			!checkText(
+				'// Определяем платформу и возвращаем платформу.',
+				withCode,
+				'code',
+				'function detectPlatform(): Platform {',
+			)
+				.findings.map((f) => f.issue)
+				.includes('Пересказ кода'),
+		)
+	})
+
+	it('ignores the code argument for chat registers', () => {
+		const report = checkText('Буду.', profile, 'dm', 'const a = 1')
+
+		assert.deepEqual(report.findings, [])
+	})
+
+	it('says so when the code corpus has not been built', () => {
+		const report = checkText('// Что угодно.', profile, 'code')
+
+		assert.equal(report.verdict, 'Корпус кода не собран.')
+	})
+
+	it('takes typography from the code corpus, not from the chat one', () => {
+		// The archive's messages hold no `«»` and its comments hold no dash: each
+		// register answers for itself, or the chat numbers would ban a dash the
+		// author does write in code.
+		const mixed: StyleProfile = {
+			...withCode,
+			typography: [{ label: 'длинное тире —', hits: 1, share: 1.1 }],
+			code: {
+				...withCode.code!,
+				typography: {
+					jsdoc: [
+						{ label: 'кавычки-ёлочки «»', hits: 0, share: 0 },
+						{ label: 'длинное тире —', hits: 300, share: 4.3 },
+					],
+				},
+			},
+		}
+
+		const doc = ['/**', ' * Ставлю «ёлочки» — и тире.', ' */'].join('\n')
+		const found = checkText(doc, mixed, 'jsdoc').findings
+		const marks = found.filter((f) => f.issue === 'Знак не из моего набора')
+
+		assert.deepEqual(
+			marks.map((f) => f.fragment),
+			['«'],
+		)
+	})
+
+	it('holds declared marks against a comment even where the archive has them', () => {
+		// The archive's handwritten comments do carry `—`, yet the owner says they
+		// never type it: the declaration wins over a share of 4.3%.
+		const declared: StyleProfile = {
+			...withCode,
+			neverMarks: [
+				{ mark: '…', standIn: '...' },
+				{ mark: '—', standIn: '--' },
+				{ mark: '→', standIn: '=>' },
+			],
+			code: {
+				...withCode.code!,
+				typography: {
+					jsdoc: [{ label: 'длинное тире —', hits: 300, share: 4.3 }],
+				},
+			},
+		}
+
+		const doc = ['директория — это Section1, файл — Section2,', 'глубже идут Section3…6. Тег → тесты.'].join('\n')
+		const report = checkText(doc, declared, 'jsdoc', 'const TAGGED_DEPTH = 2')
+
+		assert.deepEqual(
+			report.findings.map((f) => [f.fragment, f.detail]),
+			[
+				['идут Section3…6. Тег', 'пиши `...` вместо …'],
+				['директория — это', 'пиши `--` вместо —'],
+				['Тег → тесты.', 'пиши `=>` вместо →'],
+			],
+		)
+
+		assert.equal(report.score, 55)
+	})
 })

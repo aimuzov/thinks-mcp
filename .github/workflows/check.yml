@@ -1,6 +1,6 @@
 name: Check
 
-# On main the deploy workflow runs these checks before a release goes out, and
+# On main the release workflow runs these checks before a release goes out, and
 # branches are checked through their PR. A separate run on push would repeat
 # the same commit.
 on:
@@ -14,20 +14,6 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      # node:sqlite with FTS5 is stable from 24 on; the corpus depends on it.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm format:check
-      - run: pnpm test
-      - run: pnpm build
-      - run: node build/index.js --help
+      - uses: aimuzov/infra-mcp-kit/check@v1

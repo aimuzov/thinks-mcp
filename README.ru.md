@@ -31,8 +31,8 @@ MCP-сервер, который пишет, отвечает и перефор�
 
 ## Установка
 
-Нужен Node 24 или новее: корпус и поиск построены на `node:sqlite` с FTS5,
-который стабилен начиная с этой версии.
+Нужен Node 26 или новее: корпус и поиск построены на `node:sqlite` с FTS5,
+а общий кит под ним рассчитан на Node 26.
 
 ### Через mise
 
@@ -43,7 +43,7 @@ mise use -g npm:@aimuzov/thinks-mcp
 ### Локально, из исходников
 
 ```bash
-pnpm i && pnpm build && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
+npm ci && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
 ```
 
 Учти: `npm i -g` ставит бинарник в ту версию Node, которая активна в этот
@@ -107,12 +107,12 @@ THINKS_CODE_EMAILS="me@personal,me@work" thinks-mcp code ~/Projects/*/ ~/work/re
 
 ```json
 {
-  "mcpServers": {
-    "thinks": {
-      "command": "/opt/homebrew/bin/mise",
-      "args": ["exec", "npm:@aimuzov/thinks-mcp", "--", "thinks-mcp"]
-    }
-  }
+	"mcpServers": {
+		"thinks": {
+			"command": "/opt/homebrew/bin/mise",
+			"args": ["exec", "npm:@aimuzov/thinks-mcp", "--", "thinks-mcp"]
+		}
+	}
 }
 ```
 
@@ -121,12 +121,12 @@ THINKS_CODE_EMAILS="me@personal,me@work" thinks-mcp code ~/Projects/*/ ~/work/re
 
 ```json
 {
-  "mcpServers": {
-    "thinks": {
-      "command": "/opt/homebrew/bin/mise",
-      "args": ["x", "node@24", "--", "thinks-mcp"]
-    }
-  }
+	"mcpServers": {
+		"thinks": {
+			"command": "/opt/homebrew/bin/mise",
+			"args": ["x", "node@24", "--", "thinks-mcp"]
+		}
+	}
 }
 ```
 
@@ -135,13 +135,13 @@ THINKS_CODE_EMAILS="me@personal,me@work" thinks-mcp code ~/Projects/*/ ~/work/re
 
 ## Инструменты
 
-| Инструмент | Что делает |
-|---|---|
-| `write_as_me` | бриф для текста с нуля по заданию |
-| `reply_as_me` | бриф для ответа на входящее сообщение |
-| `rephrase_as_me` | бриф для переписывания готового текста |
-| `check_as_me` | детерминированная оценка 0–100 и список отклонений |
-| `find_my_messages` | поиск по архиву: «как я обычно отказываю» |
+| Инструмент         | Что делает                                         |
+| ------------------ | -------------------------------------------------- |
+| `write_as_me`      | бриф для текста с нуля по заданию                  |
+| `reply_as_me`      | бриф для ответа на входящее сообщение              |
+| `rephrase_as_me`   | бриф для переписывания готового текста             |
+| `check_as_me`      | детерминированная оценка 0–100 и список отклонений |
+| `find_my_messages` | поиск по архиву: «как я обычно отказываю»          |
 
 У каждого есть параметр `register`: `dm` — личка, `group` — групповой чат,
 `longform` — длинный авторский текст, `code` — инлайн-комментарий, `jsdoc` —
@@ -273,9 +273,9 @@ thinks-mcp --help
 В самом репозитории:
 
 ```bash
-mise run check           # типы, форматирование, тесты
-pnpm test
-pnpm build
+mise run check           # форматирование, линтер, типы, тесты
+npm test
+npm run build
 ```
 
 `holdout` — слепая проверка качества: при сборке 20 реальных пар
@@ -285,20 +285,20 @@ pnpm build
 
 ## Переменные окружения
 
-| Переменная | По умолчанию | Зачем |
-|---|---|---|
-| `THINKS_DATA_DIR` | `$XDG_CONFIG_HOME/thinks-mcp` или `~/.config/thinks-mcp` | каталог с индексом |
-| `THINKS_DUMP` | `<data-dir>/dump.json` | выгрузка, если не передана аргументом |
-| `THINKS_DB` | `<data-dir>/style.db` | путь к файлу индекса |
-| `THINKS_OWNER_ID` | автоопределение | если автоопределение ошиблось |
-| `THINKS_CHAT_STOPLIST` | пусто | чаты через запятую, которые не индексируются |
-| `THINKS_CODE_EMAILS` | `git config --global user.email` | git-адреса автора через запятую |
-| `THINKS_RECENT_YEARS` | `3` | окно «как я пишу сейчас» для профиля |
-| `THINKS_CODE_HANDWRITTEN_UNTIL` | нет | год, с которого комментарии писались не вручную: замер знаков их не берёт |
-| `THINKS_NEVER_MARKS` | пусто | знаки, которые не набираешь, и замена, например `—:--,…:...,→:=>,«:",»:"` |
-| `THINKS_BURST_WINDOW` | `90` | окно склейки сообщений в ход, секунды |
-| `THINKS_LONGFORM_MIN` | `300` | порог longform-регистра, символы |
-| `THINKS_HOLDOUT` | `20` | сколько пар отложить на слепую проверку |
+| Переменная                      | По умолчанию                                             | Зачем                                                                     |
+| ------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `THINKS_DATA_DIR`               | `$XDG_CONFIG_HOME/thinks-mcp` или `~/.config/thinks-mcp` | каталог с индексом                                                        |
+| `THINKS_DUMP`                   | `<data-dir>/dump.json`                                   | выгрузка, если не передана аргументом                                     |
+| `THINKS_DB`                     | `<data-dir>/style.db`                                    | путь к файлу индекса                                                      |
+| `THINKS_OWNER_ID`               | автоопределение                                          | если автоопределение ошиблось                                             |
+| `THINKS_CHAT_STOPLIST`          | пусто                                                    | чаты через запятую, которые не индексируются                              |
+| `THINKS_CODE_EMAILS`            | `git config --global user.email`                         | git-адреса автора через запятую                                           |
+| `THINKS_RECENT_YEARS`           | `3`                                                      | окно «как я пишу сейчас» для профиля                                      |
+| `THINKS_CODE_HANDWRITTEN_UNTIL` | нет                                                      | год, с которого комментарии писались не вручную: замер знаков их не берёт |
+| `THINKS_NEVER_MARKS`            | пусто                                                    | знаки, которые не набираешь, и замена, например `—:--,…:...,→:=>,«:",»:"` |
+| `THINKS_BURST_WINDOW`           | `90`                                                     | окно склейки сообщений в ход, секунды                                     |
+| `THINKS_LONGFORM_MIN`           | `300`                                                    | порог longform-регистра, символы                                          |
+| `THINKS_HOLDOUT`                | `20`                                                     | сколько пар отложить на слепую проверку                                   |
 
 ## Зависимости
 

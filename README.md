@@ -31,8 +31,8 @@ instead of one paragraph. Indexing single messages would teach the opposite.
 
 ## Install
 
-Node 24 or newer. The corpus and the search are built on `node:sqlite` with
-FTS5, which is stable from that version on.
+Node 26 or newer. The corpus and the search are built on `node:sqlite` with
+FTS5, and the shared kit underneath targets Node 26.
 
 ### Through mise
 
@@ -43,7 +43,7 @@ mise use -g npm:@aimuzov/thinks-mcp
 ### From source
 
 ```bash
-pnpm i && pnpm build && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
+npm ci && npm pack && npm i -g ./aimuzov-thinks-mcp-*.tgz
 ```
 
 Note that `npm i -g` installs the binary into whichever Node version is active
@@ -107,12 +107,12 @@ Copy `.mcp.json.example` to `.mcp.json`:
 
 ```json
 {
-  "mcpServers": {
-    "thinks": {
-      "command": "/opt/homebrew/bin/mise",
-      "args": ["exec", "npm:@aimuzov/thinks-mcp", "--", "thinks-mcp"]
-    }
-  }
+	"mcpServers": {
+		"thinks": {
+			"command": "/opt/homebrew/bin/mise",
+			"args": ["exec", "npm:@aimuzov/thinks-mcp", "--", "thinks-mcp"]
+		}
+	}
 }
 ```
 
@@ -121,12 +121,12 @@ binary landed in:
 
 ```json
 {
-  "mcpServers": {
-    "thinks": {
-      "command": "/opt/homebrew/bin/mise",
-      "args": ["x", "node@24", "--", "thinks-mcp"]
-    }
-  }
+	"mcpServers": {
+		"thinks": {
+			"command": "/opt/homebrew/bin/mise",
+			"args": ["x", "node@24", "--", "thinks-mcp"]
+		}
+	}
 }
 ```
 
@@ -135,12 +135,12 @@ that has not imported an archive yet gets a working server, not a failed one.
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `write_as_me` | brief for writing something from scratch |
-| `reply_as_me` | brief for answering an incoming message |
-| `rephrase_as_me` | brief for rewriting existing text |
-| `check_as_me` | deterministic 0–100 score and a list of deviations |
+| Tool               | What it does                                            |
+| ------------------ | ------------------------------------------------------- |
+| `write_as_me`      | brief for writing something from scratch                |
+| `reply_as_me`      | brief for answering an incoming message                 |
+| `rephrase_as_me`   | brief for rewriting existing text                       |
+| `check_as_me`      | deterministic 0–100 score and a list of deviations      |
 | `find_my_messages` | search the archive: "how do I usually turn things down" |
 
 Every tool takes a `register`: `dm` for private chat, `group` for group chats,
@@ -274,9 +274,9 @@ thinks-mcp --help
 In the repository itself:
 
 ```bash
-mise run check           # types, formatting, tests
-pnpm test
-pnpm build
+mise run check           # formatting, lint, types, tests
+npm test
+npm run build
 ```
 
 `holdout` is the blind quality check: at build time 20 real incoming/answer
@@ -286,20 +286,20 @@ said.
 
 ## Environment
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `THINKS_DATA_DIR` | `$XDG_CONFIG_HOME/thinks-mcp` or `~/.config/thinks-mcp` | directory holding the index |
-| `THINKS_DUMP` | `<data-dir>/dump.json` | export path, if not passed as an argument |
-| `THINKS_DB` | `<data-dir>/style.db` | index file path |
-| `THINKS_OWNER_ID` | auto-detected | set if detection picks the wrong person |
-| `THINKS_CHAT_STOPLIST` | empty | comma-separated chats to skip |
-| `THINKS_CODE_EMAILS` | `git config --global user.email` | comma-separated git author emails |
-| `THINKS_RECENT_YEARS` | `3` | window that counts as "how I write now" |
-| `THINKS_CODE_HANDWRITTEN_UNTIL` | none | year comments stopped being handwritten, for the typography count |
-| `THINKS_NEVER_MARKS` | empty | marks you never type and their stand-ins, e.g. `—:--,…:...,→:=>,«:",»:"` |
-| `THINKS_BURST_WINDOW` | `90` | burst window in seconds |
-| `THINKS_LONGFORM_MIN` | `300` | longform threshold in characters |
-| `THINKS_HOLDOUT` | `20` | pairs held out for the blind check |
+| Variable                        | Default                                                 | Purpose                                                                  |
+| ------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `THINKS_DATA_DIR`               | `$XDG_CONFIG_HOME/thinks-mcp` or `~/.config/thinks-mcp` | directory holding the index                                              |
+| `THINKS_DUMP`                   | `<data-dir>/dump.json`                                  | export path, if not passed as an argument                                |
+| `THINKS_DB`                     | `<data-dir>/style.db`                                   | index file path                                                          |
+| `THINKS_OWNER_ID`               | auto-detected                                           | set if detection picks the wrong person                                  |
+| `THINKS_CHAT_STOPLIST`          | empty                                                   | comma-separated chats to skip                                            |
+| `THINKS_CODE_EMAILS`            | `git config --global user.email`                        | comma-separated git author emails                                        |
+| `THINKS_RECENT_YEARS`           | `3`                                                     | window that counts as "how I write now"                                  |
+| `THINKS_CODE_HANDWRITTEN_UNTIL` | none                                                    | year comments stopped being handwritten, for the typography count        |
+| `THINKS_NEVER_MARKS`            | empty                                                   | marks you never type and their stand-ins, e.g. `—:--,…:...,→:=>,«:",»:"` |
+| `THINKS_BURST_WINDOW`           | `90`                                                    | burst window in seconds                                                  |
+| `THINKS_LONGFORM_MIN`           | `300`                                                   | longform threshold in characters                                         |
+| `THINKS_HOLDOUT`                | `20`                                                    | pairs held out for the blind check                                       |
 
 ## Dependencies
 

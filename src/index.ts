@@ -2,15 +2,17 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { ensureDataDir, loadConfig } from './config.js'
-import { buildCodeCorpus, formatCodeReport } from './code/build.js'
-import { buildCorpus, formatReport } from './corpus/build.js'
-import { serveHttp } from './http/app.js'
-import { serve } from './mcp/server.js'
-import { holdoutTurns } from './search/query.js'
-import { openDb } from './store/db.js'
-import { loadProfile, renderProfile, REGISTERS } from './style/profile.js'
-import type { Register } from './corpus/types.js'
+import { readVersion, runCli } from '@aimuzov/infra-mcp-kit'
+
+import { buildCodeCorpus, formatCodeReport } from './code/build.ts'
+import { ensureDataDir, loadConfig } from './config.ts'
+import { buildCorpus, formatReport } from './corpus/build.ts'
+import type { Register } from './corpus/types.ts'
+import { serveHttp } from './http/app.ts'
+import { createServer } from './mcp/server.ts'
+import { holdoutTurns } from './search/query.ts'
+import { openDb } from './store/db.ts'
+import { loadProfile, REGISTERS, renderProfile } from './style/profile.ts'
 
 const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозитории...>|profile [register]|holdout|where|--help]
 
@@ -43,126 +45,106 @@ const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозито
                         —:--,…:...,→:=>,«:",»:"
   THINKS_BURST_WINDOW, THINKS_LONGFORM_MIN, THINKS_HOLDOUT`
 
-async function main() {
-  const cfg = loadConfig()
+function build(args: string[]): void {
+	const cfg = loadConfig()
 
-  switch (process.argv[2]) {
-    case 'build': {
-      // The dump is a one-off input, not configuration: taking it as an
-      // argument is what makes the packaged binary usable from any directory.
-      const arg = process.argv[3]
-      const dumpPath = arg ? resolve(arg) : cfg.dumpPath
-      if (!existsSync(dumpPath)) {
-        throw new Error(
-          `Выгрузка не найдена: ${dumpPath}\n` +
-            'Укажи путь: `thinks-mcp build ~/Downloads/result.json`'
-        )
-      }
-      ensureDataDir(cfg)
-      const report = buildCorpus({ ...cfg, dumpPath }, msg =>
-        console.error(msg)
-      )
-      console.error('')
-      console.error(formatReport(report))
-      console.error('')
-      console.error(`Индекс: ${cfg.dbPath}`)
-      return
-    }
+	// The dump is a one-off input, not configuration: taking it as an
+	// argument is what makes the packaged binary usable from any directory.
+	const arg = args[0]
+	const dumpPath = arg ? resolve(arg) : cfg.dumpPath
 
-    case 'code': {
-      const paths = process.argv.slice(3).filter(a => !a.startsWith('-'))
-      if (!paths.length) {
-        throw new Error(
-          'Укажи хотя бы один репозиторий: `thinks-mcp code ~/Projects/*`'
-        )
-      }
-      const emails = cfg.codeEmails.length ? cfg.codeEmails : defaultEmails()
-      if (!emails.length) {
-        throw new Error(
-          'Не удалось определить твой git-email. Задай THINKS_CODE_EMAILS.'
-        )
-      }
-      ensureDataDir(cfg)
-      console.error(`Автор: ${emails.join(', ')}`)
-      const report = buildCodeCorpus(
-        cfg,
-        paths.map(p => resolve(p)),
-        emails,
-        msg => console.error(msg)
-      )
-      console.error('')
-      console.error(formatCodeReport(report))
-      console.error('')
-      console.error(`Индекс: ${cfg.dbPath}`)
-      return
-    }
+	if (!existsSync(dumpPath)) {
+		throw new Error(`Выгрузка не найдена: ${dumpPath}\n` + 'Укажи путь: `thinks-mcp build ~/Downloads/result.json`')
+	}
 
-    case 'profile': {
-      const raw = process.argv[3] ?? 'dm'
-      if (!(REGISTERS as string[]).includes(raw)) {
-        throw new Error(
-          `Неизвестный регистр: ${raw}. Доступны: ${REGISTERS.join(', ')}`
-        )
-      }
-      const db = openCorpusOrFail(cfg.dbPath)
-      const profile = loadProfile(db)
-      if (!profile) throw new Error(notBuilt(cfg.dbPath))
-      console.log(
-        renderProfile(
-          { ...profile, neverMarks: cfg.neverMarks },
-          raw as Register,
-          { full: true }
-        )
-      )
-      db.close()
-      return
-    }
+	ensureDataDir(cfg)
+	const report = buildCorpus({ ...cfg, dumpPath }, (msg) => console.error(msg))
 
-    case 'holdout': {
-      const withAnswers = process.argv.includes('--answers')
-      const db = openCorpusOrFail(cfg.dbPath)
-      const rows = holdoutTurns(db, cfg.holdoutSize)
-      if (!rows.length) {
-        throw new Error(
-          'Отложенных пар нет. Пересобери корпус с THINKS_HOLDOUT больше нуля.'
-        )
-      }
-      rows.forEach((row, i) => {
-        console.log(`[${i + 1}] ${row.register}, ${row.year}`)
-        console.log(`  Входящее: ${row.contextIn}`)
-        if (withAnswers) {
-          for (const part of row.parts) console.log(`  Ответ: ${part}`)
-        }
-        console.log('')
-      })
-      db.close()
-      return
-    }
+	console.error('')
+	console.error(formatReport(report))
+	console.error('')
+	console.error(`Индекс: ${cfg.dbPath}`)
+}
 
-    case 'where': {
-      console.log(`Каталог данных: ${cfg.dataDir}`)
-      console.log(`Индекс:         ${cfg.dbPath}`)
-      console.log(
-        `Собран:         ${existsSync(cfg.dbPath) ? 'да' : 'нет, запусти `thinks-mcp build <dump.json>`'}`
-      )
-      return
-    }
+function code(args: string[]): void {
+	const cfg = loadConfig()
 
-    case undefined:
-    case 'serve':
-      if (process.argv.includes('--http')) serveHttp()
-      else await serve(cfg)
-      return
+	const paths = args.filter((a) => !a.startsWith('-'))
 
-    case '--help':
-    case '-h':
-      console.log(USAGE)
-      return
+	if (!paths.length) {
+		throw new Error('Укажи хотя бы один репозиторий: `thinks-mcp code ~/Projects/*`')
+	}
 
-    default:
-      console.error(USAGE)
-      process.exit(1)
-  }
+	const emails = cfg.codeEmails.length ? cfg.codeEmails : defaultEmails()
+
+	if (!emails.length) {
+		throw new Error('Не удалось определить твой git-email. Задай THINKS_CODE_EMAILS.')
+	}
+
+	ensureDataDir(cfg)
+	console.error(`Автор: ${emails.join(', ')}`)
+	const report = buildCodeCorpus(
+		cfg,
+		paths.map((p) => resolve(p)),
+		emails,
+		(msg) => console.error(msg),
+	)
+
+	console.error('')
+	console.error(formatCodeReport(report))
+	console.error('')
+	console.error(`Индекс: ${cfg.dbPath}`)
+}
+
+function profile(args: string[]): void {
+	const cfg = loadConfig()
+
+	const raw = args[0] ?? 'dm'
+
+	if (!(REGISTERS as string[]).includes(raw)) {
+		throw new Error(`Неизвестный регистр: ${raw}. Доступны: ${REGISTERS.join(', ')}`)
+	}
+
+	const db = openCorpusOrFail(cfg.dbPath)
+	const measured = loadProfile(db)
+
+	if (!measured) throw new Error(notBuilt(cfg.dbPath))
+
+	console.log(renderProfile({ ...measured, neverMarks: cfg.neverMarks }, raw as Register, { full: true }))
+	db.close()
+}
+
+function holdout(args: string[]): void {
+	const cfg = loadConfig()
+
+	const withAnswers = args.includes('--answers')
+	const db = openCorpusOrFail(cfg.dbPath)
+	const rows = holdoutTurns(db, cfg.holdoutSize)
+
+	if (!rows.length) {
+		throw new Error('Отложенных пар нет. Пересобери корпус с THINKS_HOLDOUT больше нуля.')
+	}
+
+	rows.forEach((row, i) => {
+		console.log(`[${i + 1}] ${row.register}, ${row.year}`)
+		console.log(`  Входящее: ${row.contextIn}`)
+
+		if (withAnswers) {
+			for (const part of row.parts) console.log(`  Ответ: ${part}`)
+		}
+
+		console.log('')
+	})
+
+	db.close()
+}
+
+function where(): void {
+	const cfg = loadConfig()
+
+	console.log(`Каталог данных: ${cfg.dataDir}`)
+	console.log(`Индекс:         ${cfg.dbPath}`)
+	console.log(`Собран:         ${existsSync(cfg.dbPath) ? 'да' : 'нет, запусти `thinks-mcp build <dump.json>`'}`)
 }
 
 /**
@@ -171,27 +153,32 @@ async function main() {
  * so THINKS_CODE_EMAILS takes precedence when set.
  */
 function defaultEmails(): string[] {
-  try {
-    const email = execFileSync('git', ['config', '--global', 'user.email'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim()
-    return email ? [email] : []
-  } catch {
-    return []
-  }
+	try {
+		const email = execFileSync('git', ['config', '--global', 'user.email'], {
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'ignore'],
+		}).trim()
+
+		return email ? [email] : []
+	} catch {
+		return []
+	}
 }
 
 const notBuilt = (dbPath: string) =>
-  `Корпус не собран: ${dbPath} не найден.\n` +
-  'Запусти `thinks-mcp build <путь к выгрузке Telegram>`.'
+	`Корпус не собран: ${dbPath} не найден.\n` + 'Запусти `thinks-mcp build <путь к выгрузке Telegram>`.'
 
 function openCorpusOrFail(dbPath: string) {
-  if (!existsSync(dbPath)) throw new Error(notBuilt(dbPath))
-  return openDb(dbPath)
+	if (!existsSync(dbPath)) throw new Error(notBuilt(dbPath))
+
+	return openDb(dbPath)
 }
 
-main().catch(err => {
-  console.error(err instanceof Error ? err.message : err)
-  process.exit(1)
+await runCli({
+	name: 'thinks-mcp',
+	version: readVersion(import.meta.url),
+	usage: USAGE,
+	stdio: () => createServer(loadConfig()),
+	http: serveHttp,
+	commands: { build, code, profile, holdout, where },
 })
