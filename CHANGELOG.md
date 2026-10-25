@@ -4,6 +4,13 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.2](https://github.com/aimuzov/thinks-mcp/compare/v0.6.1...v0.6.2) (2026-10-25)
+
+
+### Bug Fixes
+
+* keep the hosted server up and the code corpus intact ([2476eb0](https://github.com/aimuzov/thinks-mcp/commit/2476eb0b0016bb0e2e266a8d8cbdc7b9919c7715))
+
 ## [0.6.1](https://github.com/aimuzov/thinks-mcp/compare/v0.6.0...v0.6.1) (2026-10-25)
 
 
