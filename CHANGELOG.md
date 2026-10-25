@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0](https://github.com/aimuzov/thinks-mcp/compare/v0.6.2...v0.7.0) (2026-10-25)
+
+
+### Features
+
+* store each turn's text once and export a slim copy for a server ([474cd02](https://github.com/aimuzov/thinks-mcp/commit/474cd0278517d169e1f8dbfffbbfa951bddc0a23))
+* store each turn's text once and export a slim copy for a server ([96ad945](https://github.com/aimuzov/thinks-mcp/commit/96ad9457f50168fd07cabb80c8e68308231cfbf8))
+
 ## [0.6.2](https://github.com/aimuzov/thinks-mcp/compare/v0.6.1...v0.6.2) (2026-10-25)
 
 
