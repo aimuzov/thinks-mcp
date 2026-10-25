@@ -1,14 +1,18 @@
 import { createWriteStream, mkdirSync } from 'node:fs'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
-import { Transform } from 'node:stream'
+import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import type { ReadableStream as WebReadableStream } from 'node:stream/web'
 import { fileURLToPath } from 'node:url'
 import { log } from '@aimuzov/infra-mcp-kit'
 import {
 	apiError,
 	createHttpApp,
 	errorPage,
+	InvalidRequestError,
+	listen as listenApp,
+	readBody,
 	requireSession,
 	sameOrigin,
 	sendJson,
@@ -18,9 +22,10 @@ import {
 	telegramUser,
 	Tokens,
 	type AuthStore,
-	type HttpContext,
+	type HttpApp,
+	type Route,
+	type TokenClaims,
 } from '@aimuzov/infra-mcp-kit/http'
-import express, { type Express } from 'express'
 
 import { createServer } from '#thinks/mcp/server'
 
@@ -60,13 +65,16 @@ export type AccountState = {
  */
 const SESSION_COOKIE = 'thinks_session'
 
-export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }: AppDeps): Express {
+/** Настройки -- несколько коротких строк, больше этого JSON не бывает. */
+const SETTINGS_LIMIT = 16 * 1024
+
+export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }: AppDeps): HttpApp {
 	const { http } = cfg
 	const telegram = { botToken: cfg.telegramBotToken, devUserId: cfg.devUserId }
 	// Shared with the account cookie, so it is built here, not by the kit.
 	const tokens = new Tokens({ secret: http.authSecret, issuer: http.publicUrl.href })
 
-	const { app } = createHttpApp({
+	return createHttpApp({
 		config: http,
 		service: SERVICE,
 		publicDir,
@@ -82,10 +90,8 @@ export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }:
 
 			return createServer(users.config(userId), users.corpus(userId))
 		},
-		routes: (app, context) => mountAccount(app, context, { cfg, store, users, builds }),
+		routes: accountRoutes({ cfg, store, users, builds }),
 	})
-
-	return app
 }
 
 type AccountDeps = {
@@ -95,12 +101,29 @@ type AccountDeps = {
 	builds: Builds
 }
 
-function mountAccount(app: Express, { tokens }: HttpContext, { cfg, store, users, builds }: AccountDeps) {
+/** Маршрут кабинета по ключу "МЕТОД /путь": нет ключа -- запрос уходит дальше, к 404 кита. */
+type Handler = (request: Request) => Response | Promise<Response>
+
+function accountRoutes({ cfg, store, users, builds }: AccountDeps): Route {
+	let session: ReturnType<typeof sessions> | undefined
+	let table: Record<string, Handler> | undefined
+
+	// Кит отдаёт свои `tokens` только в контексте запроса: маршруты собираются на первом.
+	return (request, context) => {
+		session ??= sessions(context.tokens, cfg.http.publicUrl, SESSION_COOKIE)
+		table ??= accountTable(session, { cfg, store, users, builds })
+
+		const handler = table[`${request.method} ${new URL(request.url).pathname}`]
+
+		return handler?.(request)
+	}
+}
+
+function accountTable(
+	session: ReturnType<typeof sessions>,
+	{ cfg, store, users, builds }: AccountDeps,
+): Record<string, Handler> {
 	const { publicUrl } = cfg.http
-	const session = sessions(tokens, publicUrl, SESSION_COOKIE)
-	const signedIn = requireSession(session)
-	const origin = sameOrigin(publicUrl)
-	const userOf = (res: express.Response) => String(res.locals.session.sub)
 
 	const state = (userId: string, name: string): AccountState => {
 		const status = builds.status(userId)
@@ -115,122 +138,143 @@ function mountAccount(app: Express, { tokens }: HttpContext, { cfg, store, users
 		}
 	}
 
-	app.get('/account/state', signedIn, (_req, res) => {
-		sendJson(res, state(userOf(res), String(res.locals.session.name ?? '')))
-	})
+	const nameOf = (claims: TokenClaims) => String(claims.name ?? '')
 
-	// Страница входа статична и не знает, как запущен сервер: на localhost
-	// у неё вместо виджета dev-ссылка, а имя бота -- то, которым сервер проверяет подпись.
-	app.get('/account/auth', (_req, res) => {
-		sendJson(res, { botName: cfg.telegramBotName, dev: cfg.devUserId || null })
-	})
+	/** Изменяющий запрос: чужой Origin -- 403, без сессии -- 401. */
+	const guarded =
+		(fn: (request: Request, claims: TokenClaims) => Response | Promise<Response>, checkOrigin = true): Handler =>
+		async (request) => {
+			const foreign = checkOrigin ? sameOrigin(publicUrl, request) : undefined
 
-	// Сюда виджет Telegram возвращает человека с подписанным query.
-	app.get('/account/login', async (req, res) => {
-		const login = telegramUser(req, { botToken: cfg.telegramBotToken, devUserId: cfg.devUserId })
+			if (foreign) return foreign
 
-		if (!login) {
-			return void res.redirect(
-				302,
-				errorPage({ code: 'login', title: 'Telegram не подтвердил вход', message: 'Попробуй войти ещё раз.' }),
+			const claims = await requireSession(session, request)
+
+			if (claims instanceof Response) return claims
+
+			return fn(request, claims)
+		}
+
+	return {
+		'GET /account/state': guarded((_request, claims) => sendJson(state(String(claims.sub), nameOf(claims))), false),
+
+		// Страница входа статична и не знает, как запущен сервер: на localhost
+		// у неё вместо виджета dev-ссылка, а имя бота -- то, которым сервер проверяет подпись.
+		'GET /account/auth': () => sendJson({ botName: cfg.telegramBotName, dev: cfg.devUserId || null }),
+
+		// Сюда виджет Telegram возвращает человека с подписанным query.
+		'GET /account/login': async (request) => {
+			const query = Object.fromEntries(new URL(request.url).searchParams)
+			const login = telegramUser(query, { botToken: cfg.telegramBotToken, devUserId: cfg.devUserId })
+
+			if (!login) {
+				return redirect(
+					errorPage({
+						code: 'login',
+						title: 'Telegram не подтвердил вход',
+						message: 'Попробуй войти ещё раз.',
+					}),
+				)
+			}
+
+			return redirect(
+				'/account',
+				await session.cookie({ sub: login.id, name: login.firstName || login.username }),
 			)
-		}
+		},
 
-		await session.write(res, { sub: login.id, name: login.firstName || login.username })
-		res.redirect(302, '/account')
-	})
+		'POST /account/logout': (request) =>
+			sameOrigin(publicUrl, request) ?? sendJson({ ok: true }, 200, { 'set-cookie': session.clearCookie() }),
 
-	app.post('/account/logout', origin, (_req, res) => {
-		session.clear(res)
-		sendJson(res, { ok: true })
-	})
+		'PUT /account/upload': guarded(async (request, claims) => {
+			const userId = String(claims.sub)
 
-	app.put('/account/upload', origin, signedIn, async (req, res) => {
-		const userId = userOf(res)
+			if (Number(request.headers.get('content-length')) > cfg.maxUploadBytes) {
+				return apiError(413, 'too_large', 'Файл больше допустимого')
+			}
 
-		if (Number(req.get('content-length')) > cfg.maxUploadBytes) {
-			return void apiError(res, 413, 'too_large', 'Файл больше допустимого')
-		}
+			// Две загрузки одного пользователя писали бы в один и тот же файл.
+			if (!builds.beginUpload(userId)) {
+				return apiError(409, 'busy', 'Предыдущая загрузка или сборка ещё не закончилась')
+			}
 
-		// Две загрузки одного пользователя писали бы в один и тот же файл.
-		if (!builds.beginUpload(userId)) {
-			return void apiError(res, 409, 'busy', 'Предыдущая загрузка или сборка ещё не закончилась')
-		}
+			try {
+				mkdirSync(users.dir(userId), { recursive: true })
 
-		try {
-			mkdirSync(users.dir(userId), { recursive: true })
-			await pipeline(req, sizeLimit(cfg.maxUploadBytes), createWriteStream(builds.dumpPath(userId)))
-		} catch (err) {
-			builds.discardUpload(userId)
+				await pipeline(
+					request.body ? Readable.fromWeb(request.body as WebReadableStream<Uint8Array>) : Readable.from([]),
+					sizeLimit(cfg.maxUploadBytes),
+					createWriteStream(builds.dumpPath(userId)),
+				)
+			} catch (err) {
+				builds.discardUpload(userId)
 
-			return void uploadFailed(res, err, userId)
-		} finally {
-			builds.endUpload(userId)
-		}
+				return uploadFailed(err, userId)
+			} finally {
+				builds.endUpload(userId)
+			}
 
-		builds.enqueue(userId)
-		sendJson(res, state(userId, String(res.locals.session.name ?? '')), 202)
-	})
+			builds.enqueue(userId)
 
-	app.post('/account/settings', origin, signedIn, jsonBody('16kb'), (req, res) => {
-		// Старая форма кабинета слала urlencoded, и вкладка, открытая до деплоя, пришла бы
-		// с пустым для express.json телом: настройки сбросились бы к умолчаниям.
-		if (!req.is('application/json')) {
-			return void apiError(res, 415, 'json_only', 'Обнови страницу кабинета и сохрани ещё раз')
-		}
+			return sendJson(state(userId, nameOf(claims)), 202)
+		}),
 
-		const userId = userOf(res)
-		const body = (req.body ?? {}) as Record<string, unknown>
-		const years = Number.parseInt(String(body.recentYears ?? ''), 10)
+		'POST /account/settings': guarded(async (request, claims) => {
+			// Старая форма кабинета слала urlencoded, и вкладка, открытая до деплоя, пришла бы
+			// с пустым телом: настройки сбросились бы к умолчаниям.
+			if (!isJson(request)) return apiError(415, 'json_only', 'Обнови страницу кабинета и сохрани ещё раз')
 
-		users.saveSettings(userId, {
-			neverMarks: String(body.neverMarks ?? '').trim(),
-			chatStopList: String(body.chatStopList ?? '').trim(),
-			recentYears: years >= 1 && years <= 20 ? years : DEFAULT_SETTINGS.recentYears,
-			voice: body.voice === true,
-		})
+			let body: Record<string, unknown>
 
-		sendJson(res, state(userId, String(res.locals.session.name ?? '')))
-	})
+			try {
+				body = (JSON.parse((await readBody(request, SETTINGS_LIMIT)) || '{}') ?? {}) as Record<string, unknown>
+			} catch (err) {
+				// Битое или слишком большое тело прислал клиент, сервер тут ни при чём.
+				if (err instanceof InvalidRequestError) return apiError(413, 'too_large', 'Слишком большой запрос')
 
-	app.post('/account/delete', origin, signedIn, (_req, res) => {
-		const userId = userOf(res)
+				return apiError(400, 'bad_json', 'Не удалось прочитать настройки')
+			}
 
-		// Идущую сборку не остановить, а её статус и корпус легли бы в уже
-		// удалённый каталог.
-		if (!builds.cancel(userId)) {
-			return void apiError(res, 409, 'busy', 'Дождись конца сборки, потом удаляй аккаунт')
-		}
+			const userId = String(claims.sub)
+			const years = Number.parseInt(String(body.recentYears ?? ''), 10)
 
-		// Токены MCP-клиентов живут дольше сессии кабинета: без отзыва
-		// клиент продолжил бы ходить в удалённый аккаунт.
-		store.revokeSubject(userId)
-		users.remove(userId)
-		session.clear(res)
-		sendJson(res, { ok: true })
-	})
+			users.saveSettings(userId, {
+				neverMarks: String(body.neverMarks ?? '').trim(),
+				chatStopList: String(body.chatStopList ?? '').trim(),
+				recentYears: years >= 1 && years <= 20 ? years : DEFAULT_SETTINGS.recentYears,
+				voice: body.voice === true,
+			})
+
+			return sendJson(state(userId, nameOf(claims)))
+		}),
+
+		'POST /account/delete': guarded((_request, claims) => {
+			const userId = String(claims.sub)
+
+			// Идущую сборку не остановить, а её статус и корпус легли бы в уже
+			// удалённый каталог.
+			if (!builds.cancel(userId)) return apiError(409, 'busy', 'Дождись конца сборки, потом удаляй аккаунт')
+
+			// Токены MCP-клиентов живут дольше сессии кабинета: без отзыва
+			// клиент продолжил бы ходить в удалённый аккаунт.
+			store.revokeSubject(userId)
+			users.remove(userId)
+
+			return sendJson({ ok: true }, 200, { 'set-cookie': session.clearCookie() })
+		}),
+	}
 }
 
-/**
- * express.json, чья ошибка разбора -- 400 с кодом, а не 500 из общего
- * обработчика: битое тело прислал клиент, сервер тут ни при чём.
- */
-function jsonBody(limit: string): express.RequestHandler {
-	const parse = express.json({ limit })
+function redirect(location: string, cookie?: string): Response {
+	const headers = new Headers({ location })
 
-	return (req, res, next) =>
-		parse(req, res, (err?: unknown) => {
-			if (!err) return next()
+	if (cookie) headers.set('set-cookie', cookie)
 
-			const type = (err as { type?: string }).type
-
-			if (type === 'entity.too.large') return apiError(res, 413, 'too_large', 'Слишком большой запрос')
-
-			if (type === 'entity.parse.failed') return apiError(res, 400, 'bad_json', 'Не удалось прочитать настройки')
-
-			next(err)
-		})
+	return new Response(null, { status: 302, headers })
 }
+
+const isJson = (request: Request) =>
+	(request.headers.get('content-type') ?? '').split(';')[0]?.trim().toLowerCase() === 'application/json'
 
 class TooLarge extends Error {}
 
@@ -249,18 +293,19 @@ function sizeLimit(max: number): Transform {
 }
 
 /** Only an oversized file is the user's fault; a full disk is ours. */
-function uploadFailed(res: express.Response, err: unknown, userId: string): void {
-	if (err instanceof TooLarge) return apiError(res, 413, 'too_large', 'Файл больше допустимого')
+function uploadFailed(err: unknown, userId: string): Response {
+	if (err instanceof TooLarge) return apiError(413, 'too_large', 'Файл больше допустимого')
 
 	const code = (err as NodeJS.ErrnoException).code
 
 	// Клиент оборвал загрузку: ответ до него уже не дойдёт, и это не сбой сервера.
-	if (code === 'ECONNRESET' || code === 'ERR_STREAM_PREMATURE_CLOSE') {
-		return apiError(res, 400, 'aborted', 'Загрузка оборвалась')
+	if (code === 'ECONNRESET' || code === 'ERR_STREAM_PREMATURE_CLOSE' || code === 'ABORT_ERR') {
+		return apiError(400, 'aborted', 'Загрузка оборвалась')
 	}
 
 	log.error(`Не удалось сохранить загрузку ${userId}`, { error: String(err) })
-	apiError(res, 500, 'upload_failed', 'Не удалось сохранить файл, попробуй позже')
+
+	return apiError(500, 'upload_failed', 'Не удалось сохранить файл, попробуй позже')
 }
 
 /** Run the hosted server. Configured entirely from the environment. */
@@ -280,18 +325,10 @@ export async function serveHttp(): Promise<Server> {
 
 	const app = createApp({ cfg, store: sqliteStore(authDb), users, builds })
 
-	const server = await listen(app, cfg.http.port)
-
-	log.info(`${SERVICE.name} listening on :${cfg.http.port} as ${cfg.http.publicUrl.href}`)
-
-	return server
+	return listen(app, cfg.http.port, `${SERVICE.name} listening on :${cfg.http.port} as ${cfg.http.publicUrl.href}`)
 }
 
 /** Resolves once the port is bound; rejects when it cannot be, e.g. EADDRINUSE. */
-export function listen(app: Express, port: number): Promise<Server> {
-	return new Promise((resolve, reject) => {
-		// Express 5 отдаёт ошибку listen в этот же колбэк; без проверки занятый
-		// порт выглядел бы успешным стартом.
-		const server = app.listen(port, (err?: Error) => (err ? reject(err) : resolve(server)))
-	})
+export function listen(app: HttpApp, port: number, message?: string): Promise<Server> {
+	return listenApp(app, port, message)
 }

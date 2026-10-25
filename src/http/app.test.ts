@@ -16,7 +16,6 @@ import {
 	textOf,
 	type RunningHttp,
 } from '@aimuzov/infra-mcp-kit/testing'
-import express from 'express'
 
 import { buildCorpus } from '#thinks/corpus/build'
 import { makeDump } from '#thinks/testing/fixtures'
@@ -877,7 +876,14 @@ describe('listen', () => {
 		const { port } = busy.address() as AddressInfo
 
 		try {
-			await assert.rejects(listen(express(), port), { code: 'EADDRINUSE' })
+			const app = createApp({
+				cfg: config(`http://127.0.0.1:${port}/`),
+				store: sqliteStore(join(dataDir, 'auth.db')),
+				users,
+				builds,
+			})
+
+			await assert.rejects(listen(app, port), { code: 'EADDRINUSE' })
 		} finally {
 			busy.close()
 		}

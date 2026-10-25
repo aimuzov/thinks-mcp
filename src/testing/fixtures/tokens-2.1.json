@@ -1,0 +1,21 @@
+{
+	"secret": "fixture-secret-xxxxxxxxxxxxxxxxxxxxxxxxx",
+	"issuer": "https://connector.example.com/",
+	"createdAt": 1792946918081,
+	"modes": {
+		"sign": {
+			"clientId": "client-sign",
+			"access_token": "eyJhbGciOiJIUzI1NiJ9.eyJuYW1lIjoiQWxleCIsInN1YiI6InVzZXItc2lnbiIsImNsaWVudF9pZCI6ImNsaWVudC1zaWduIiwia2luZCI6ImFjY2VzcyIsImlzcyI6Imh0dHBzOi8vY29ubmVjdG9yLmV4YW1wbGUuY29tLyIsImlhdCI6MTc5Mjk0NjkxOCwiZXhwIjoxNzkyOTUwNTE4fQ.i40BKpQVBERlK7t8JHJA1Re8LYOD6k6i5CqVqcJ83Vo",
+			"token_type": "Bearer",
+			"expires_in": 3600,
+			"refresh_token": "eyJhbGciOiJIUzI1NiJ9.eyJuYW1lIjoiQWxleCIsInN1YiI6InVzZXItc2lnbiIsImNsaWVudF9pZCI6ImNsaWVudC1zaWduIiwianRpIjoiZjU5MWJiZDgtYTgxYy00ZWNhLThiZjItZmExMDVhMzA2MmU0IiwiZmFtIjoiMjAxMTQ1NzYtODU4ZC00ZWVmLThhNDYtYjNhMWUzYTI3YThiIiwiYXV0aF90aW1lIjoxNzkyOTQ2OTE4LCJraW5kIjoicmVmcmVzaCIsImlzcyI6Imh0dHBzOi8vY29ubmVjdG9yLmV4YW1wbGUuY29tLyIsImlhdCI6MTc5Mjk0NjkxOCwiZXhwIjoxNzk1NTM4OTE4fQ.unHbVHhACgi5vpQEkxLIqJLzudGmNn8Es7KjuEJJcMU"
+		},
+		"encrypt": {
+			"clientId": "client-encrypt",
+			"access_token": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..yrZ-CSiiQqKUqlCo.1TN8JhZN8OZgvhl5gEsrrgVyaXPu6qp2N8SnHFgVdZy77-tzNPe7-KarafFD7EbVl7LyZSNqs83rgtOQ7Mfp8Rtcf5UhOWDqjn54JyKFNVTDO1Qnc_yPpXF0d2HTSEYSMpqljSzDPrVBdPAJEyU1T85kUmJkPAZ-dZjCLh5oP1rV02HseVMOUBbsaNFa_ROKZCtU65hAFm2XsL8QZhfrb9jsrm035zY.9S_JbUAKJUe57KQeX7ifKg",
+			"token_type": "Bearer",
+			"expires_in": 3600,
+			"refresh_token": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..IPJZpYVhkfvMU3di.eIxXMJstFgWnvaDC3gmH1IlebhEPOnhLphyRwNX6wSqP4YPYsGBlJL4hMjwpI0se8CJaKqiCmSdMY4GabiNdtS1Ufv9a7IqQ8rd4bFRh_7Z6vBYq21DJCPcH9kiSHo0neEgNIyXXksjnJATZw2Z4Kl77eFF6fw_VzK7Z6nzDi_u4Z2QKam-AXrrwoYmyo3-Y3shkudx-8FcesLK7eU2R6lkEFDLLmAEud9txfbmCrro-JjTHY3WqJVYYP-nB4rxSqNYg7y2DYsHO3L9nQ6vHgJlap1hCVNjag2kwjdXu1nPiiGgqkmKiVMtUiLNW6hWsQfIn0V96b8ZHmP92NV7_u0dUiEXiBUMD9VuGhdxRKGXHQu-BgvOSl_Q.Rh0qLAXz4CZfX8KVbXu2KA"
+		}
+	}
+}

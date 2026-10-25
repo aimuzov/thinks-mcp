@@ -9,7 +9,9 @@ COPY src ./src
 # Страницы собирает Astro в build/public. Имя бота для входа клиента вшивается в них
 # здесь: окружение прода на сборку не попадает, по умолчанию берётся боевой бот.
 ARG TELEGRAM_BOT_NAME
-RUN npm run build && npm prune --omit=dev
+# --omit=optional: SDK (опциональный peer кита для тестов) и typescript (peer valibot
+# из tmcp) npm помечает devOptional, и одно --omit=dev их оставляет -- плюс 30 МБ.
+RUN npm run build && npm prune --omit=dev --omit=optional
 
 FROM node:26.11.1-alpine
 WORKDIR /app
