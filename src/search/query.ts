@@ -1,5 +1,5 @@
 import type { Register } from '#thinks/corpus/types'
-import type { Db } from '#thinks/store/db'
+import { readParts, type Db } from '#thinks/store/db'
 
 import { tokenize } from './stem.ts'
 
@@ -152,7 +152,7 @@ type RawRow = {
 	lang: string | null
 	ts: number
 	year: number
-	parts: string
+	parts: string | null
 	text: string
 	chars: number
 	context_in: string | null
@@ -171,7 +171,7 @@ const toRow = (r: RawRow): TurnRow => ({
 	lang: r.lang,
 	ts: r.ts,
 	year: r.year,
-	parts: JSON.parse(r.parts) as string[],
+	parts: readParts(r.parts, r.text),
 	text: r.text,
 	chars: r.chars,
 	contextIn: r.context_in,

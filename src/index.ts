@@ -12,10 +12,10 @@ import { serveHttp } from './http/app.ts'
 import { corpusMissing } from './mcp/context.ts'
 import { createServer } from './mcp/server.ts'
 import { holdoutTurns } from './search/query.ts'
-import { openDb } from './store/db.ts'
+import { exportForServer, openDb } from './store/db.ts'
 import { loadProfile, REGISTERS, renderProfile } from './style/profile.ts'
 
-const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозитории...>|profile [register]|holdout|where|--help]
+const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозитории...>|profile [register]|holdout|export <файл>|where|--help]
 
   serve             запустить MCP-сервер на stdio (по умолчанию)
   serve --http      запустить многопользовательский сервер с OAuth и кабинетом.
@@ -31,6 +31,7 @@ const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозито
                     отложенные пары для слепой проверки: входящие сообщения,
                     которых нет в индексе. С --answers -- настоящие ответы,
                     чтобы сравнить с тем, что сочинила модель
+  export <файл>     копия корпуса для сервера, без кэша git blame
   where             показать, где лежат корпус и профиль
 
 Переменные окружения:
@@ -140,6 +141,22 @@ function holdout(args: string[]): void {
 	db.close()
 }
 
+function exportCorpus(args: string[]): void {
+	const cfg = loadConfig()
+
+	if (!args[0]) throw new Error('Укажи файл: `thinks-mcp export ~/style.db`')
+
+	const dest = resolve(args[0])
+
+	if (existsSync(dest)) throw new Error(`Файл уже есть: ${dest}`)
+
+	const db = openCorpusOrFail(cfg.dbPath)
+
+	exportForServer(db, dest)
+	db.close()
+	console.error(`Копия для сервера: ${dest}`)
+}
+
 function where(): void {
 	const cfg = loadConfig()
 
@@ -180,5 +197,5 @@ await runCli({
 	usage: USAGE,
 	stdio: () => createServer(loadConfig()),
 	http: serveHttp,
-	commands: { build, code, profile, holdout, where },
+	commands: { build, code, profile, holdout, export: exportCorpus, where },
 })

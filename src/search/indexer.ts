@@ -1,5 +1,5 @@
 import type { Turn } from '#thinks/corpus/types'
-import { nextTurnId, run, type Db } from '#thinks/store/db'
+import { nextTurnId, run, storedParts, type Db } from '#thinks/store/db'
 
 /**
  * Write turns to the corpus table.
@@ -37,7 +37,7 @@ export function insertTurns(db: Db, turns: Turn[], holdoutPositions: Set<number>
 				turn.lang ?? null,
 				turn.ts,
 				turn.year,
-				JSON.stringify(turn.parts),
+				storedParts(turn.parts, turn.text),
 				turn.text,
 				turn.parts.length,
 				turn.chars,

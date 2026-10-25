@@ -14,9 +14,13 @@ export type Db = DatabaseSync
  * Both indexes hold stemmed text (see search/stem.ts): FTS5's unicode61
  * tokenizer handles Cyrillic but does no morphology, so "сообщение" and
  * "сообщения" would otherwise never match.
+ *
+ * `parts` is NULL whenever splitting `text` on newlines gives the parts back,
+ * which is nearly every turn: storing both doubled the biggest table for
+ * nothing. See `storedParts` and `readParts`.
  */
-const SCHEMA = [
-	`CREATE TABLE IF NOT EXISTS turn (
+const turnTable = (name: string) =>
+	`CREATE TABLE IF NOT EXISTS ${name} (
      id         INTEGER PRIMARY KEY,
      chat_key   TEXT NOT NULL,
      register   TEXT NOT NULL,
@@ -25,16 +29,23 @@ const SCHEMA = [
      lang       TEXT,
      ts         INTEGER NOT NULL,
      year       INTEGER NOT NULL,
-     parts      TEXT NOT NULL,
+     parts      TEXT,
      text       TEXT NOT NULL,
      n_parts    INTEGER NOT NULL,
      chars      INTEGER NOT NULL,
      context_in TEXT,
      context_explicit INTEGER NOT NULL DEFAULT 0,
      context_lag INTEGER
-   )`,
+   )`
+
+const TURN_INDEXES = [
 	`CREATE INDEX IF NOT EXISTS turn_register ON turn(register, longform, holdout)`,
 	`CREATE INDEX IF NOT EXISTS turn_year ON turn(year)`,
+]
+
+const SCHEMA = [
+	turnTable('turn'),
+	...TURN_INDEXES,
 	`CREATE VIRTUAL TABLE IF NOT EXISTS turn_fts USING fts5(
      stems, content='', tokenize='unicode61'
    )`,
@@ -98,7 +109,90 @@ export function openDb(path: string): Db {
 
 	migrate(db)
 
+	// Freed pages are only reused, never returned, so without this the file
+	// keeps its old size. Runs once, on the first open after the upgrade.
+	if (slimTurns(db)) run(db, 'VACUUM')
+
 	return db
+}
+
+/** `parts` as stored: null when `readParts` can get them back from `text`. */
+export function storedParts(parts: string[], text: string): string | null {
+	return splitsBack(parts, text) ? null : JSON.stringify(parts)
+}
+
+export function readParts(stored: string | null, text: string): string[] {
+	return stored == null ? text.split('\n') : (JSON.parse(stored) as string[])
+}
+
+// A part with a line break of its own cannot be told from two parts once
+// joined, so only those turns keep `parts`.
+function splitsBack(parts: string[], text: string): boolean {
+	const lines = text.split('\n')
+
+	return lines.length === parts.length && lines.every((l, i) => l === parts[i])
+}
+
+/**
+ * Drop the `parts` that corpora built before 0.7 duplicated on every row.
+ *
+ * SQLite cannot relax NOT NULL in place, so the table is copied. Row ids are
+ * kept, and with them the FTS indexes keyed by them. Returns whether anything
+ * changed, so the caller knows the file is worth a VACUUM.
+ */
+function slimTurns(db: Db): boolean {
+	const columns = db.prepare('PRAGMA table_info(turn)').all() as unknown as {
+		name: string
+		notnull: number
+	}[]
+
+	if (!columns.find((c) => c.name === 'parts')?.notnull) return false
+
+	db.function('parts_split_back', { deterministic: true }, (parts, text) =>
+		splitsBack(JSON.parse(String(parts)) as string[], String(text)) ? 1 : 0,
+	)
+
+	const names = columns.map((c) => c.name).join(', ')
+
+	run(db, 'BEGIN')
+
+	try {
+		run(db, turnTable('turn_slim'))
+		run(db, `INSERT INTO turn_slim (${names}) SELECT ${names} FROM turn`)
+		run(db, 'DROP TABLE turn')
+		run(db, 'ALTER TABLE turn_slim RENAME TO turn')
+
+		for (const stmt of TURN_INDEXES) run(db, stmt)
+
+		run(db, 'UPDATE turn SET parts = NULL WHERE parts_split_back(parts, text)')
+		run(db, 'COMMIT')
+	} catch (err) {
+		run(db, 'ROLLBACK')
+
+		throw err
+	}
+
+	return true
+}
+
+/**
+ * Write a copy of the corpus to `dest` for serving from another machine.
+ *
+ * The blame cache stays behind: it only saves `git blame` time on the next
+ * `thinks-mcp code`, which never runs on a server, and it takes about a tenth
+ * of the file. `dest` must not exist yet.
+ */
+export function exportForServer(db: Db, dest: string): void {
+	db.prepare('VACUUM INTO ?').run(dest)
+
+	const out = new DatabaseSync(dest)
+
+	try {
+		run(out, 'DELETE FROM blame_cache')
+		run(out, 'VACUUM')
+	} finally {
+		out.close()
+	}
 }
 
 /**
