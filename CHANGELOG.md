@@ -4,6 +4,19 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0](https://github.com/aimuzov/thinks-mcp/compare/v0.5.0...v0.6.0) (2026-10-25)
+
+
+### Features
+
+* move to infra-mcp-kit and the shared MCP standard ([79ac51e](https://github.com/aimuzov/thinks-mcp/commit/79ac51e01b169e00875b598a15ccf45b9fce3486))
+* serve the hosted connector on infra-mcp-kit with the Signal pages ([6bb46b2](https://github.com/aimuzov/thinks-mcp/commit/6bb46b2f1a065775560c2d6e12b182d86c8144d7))
+
+
+### Bug Fixes
+
+* **deps:** take infra-mcp-kit v1.0.1, which installs from GitHub with its build ([d2f8bac](https://github.com/aimuzov/thinks-mcp/commit/d2f8bac560d8918813b72cbfa64b8b61b076ab43))
+
 ## [0.5.0](https://github.com/aimuzov/thinks-mcp/compare/v0.4.0...v0.5.0) (2026-10-24)
 
 
