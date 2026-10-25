@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0](https://github.com/aimuzov/thinks-mcp/compare/v0.7.0...v0.8.0) (2026-10-25)
+
+
+### Features
+
+* move the account to infra-mcp-kit 2.0 pages on Astro ([a91add7](https://github.com/aimuzov/thinks-mcp/commit/a91add7e2c5183d0feb9f43ffbeb6b0196d77bb1))
+* move the account to infra-mcp-kit 2.0 pages on Astro ([a78eab1](https://github.com/aimuzov/thinks-mcp/commit/a78eab116c3ac048e429c438c15658cb2fee0147))
+
 ## [0.7.0](https://github.com/aimuzov/thinks-mcp/compare/v0.6.2...v0.7.0) (2026-10-25)
 
 
