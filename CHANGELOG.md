@@ -4,6 +4,15 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.4](https://github.com/aimuzov/thinks-mcp/compare/v0.9.3...v0.9.4) (2026-10-26)
+
+
+### Bug Fixes
+
+* accept the kit 3.1 tool type on the landing ([745972f](https://github.com/aimuzov/thinks-mcp/commit/745972f8927d3465b779428fe89c2a202ca3a306))
+* **deps:** move to infra-mcp-kit 3.1.0 for the new header ([78b7a10](https://github.com/aimuzov/thinks-mcp/commit/78b7a1096f437b7c82c7ead05530bf76e2ad29cd))
+* **deps:** move to infra-mcp-kit 3.1.0 for the new header ([79f20a2](https://github.com/aimuzov/thinks-mcp/commit/79f20a2f06694946b0830281cf31bce3b6ab5b5c))
+
 ## [0.9.3](https://github.com/aimuzov/thinks-mcp/compare/v0.9.2...v0.9.3) (2026-10-26)
 
 
