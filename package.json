@@ -63,11 +63,11 @@
 		"test:ui": "npm run build && node --conditions=thinks-source --test e2e/*.e2e.ts"
 	},
 	"dependencies": {
-		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#feature/i18n",
+		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v3.2.0",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
-		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#feature/i18n",
+		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v4.2.0",
 		"@astrojs/check": "0.9.12",
 		"@astrojs/svelte": "9.1.1",
 		"@lucide/svelte": "1.39.0",
