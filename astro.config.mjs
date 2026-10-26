@@ -4,6 +4,8 @@ import mcpPages from '@aimuzov/infra-mcp-kit/astro'
 import svelte from '@astrojs/svelte'
 import { defineConfig } from 'astro/config'
 
+import strings from './src/frontend/strings.mjs'
+
 export default defineConfig({
 	srcDir: './src/frontend',
 	outDir: './build/public',
@@ -16,6 +18,7 @@ export default defineConfig({
 				tagline: 'Пишет, отвечает и переформулирует твоим голосом',
 				lead: 'MCP-коннектор, который учится по твоей переписке в Telegram. Сам он ничего не генерирует: отдаёт модели стиль-профиль и твои настоящие сообщения под запрос.',
 				tools: ['write_as_me', 'reply_as_me', 'rephrase_as_me', 'check_as_me', 'find_my_messages'],
+				strings,
 			},
 			telegram: {
 				// Имя бота видно всем на странице входа, секрет -- только его токен. Страница
@@ -25,6 +28,7 @@ export default defineConfig({
 			},
 			// Лендинг свой: ему нужна дорога в кабинет, см. src/frontend/pages/index.astro.
 			override: ['index'],
+			locales: ['ru', 'en'],
 		}),
 	],
 })

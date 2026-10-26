@@ -3,6 +3,10 @@
 	import Card from '@aimuzov/infra-site-kit/ui/card.svelte'
 	import Skeleton from '@aimuzov/infra-site-kit/ui/skeleton.svelte'
 
+	import { pt } from '@aimuzov/infra-mcp-kit/astro/lib/i18n.ts'
+
+	let { locale = 'ru' }: { locale?: string } = $props()
+
 	// Вход в кабинет, а не OAuth клиента: виджет ведёт на /account/login, и сервер ставит cookie.
 	type Auth = { botName: string; dev: string | null }
 
@@ -36,24 +40,21 @@
 
 <div class="auth">
 	<Card>
-		<p class="eyebrow">Кабинет</p>
-		<h1>Вход в&nbsp;кабинет</h1>
-		<p class="muted">
-			Корпус привязан к&nbsp;твоему Telegram, и&nbsp;загрузить можно только свою выгрузку. Войди тем аккаунтом,
-			чью переписку хочешь отдать коннектору.
-		</p>
+		<p class="eyebrow">{pt(locale, 'thinks.signin.eyebrow')}</p>
+		<h1>{pt(locale, 'thinks.signin.title')}</h1>
+		<p class="muted">{pt(locale, 'thinks.signin.text')}</p>
 		{#if failed}
-			<Alert variant="danger" title="Вход не загрузился">Обнови страницу или зайди чуть позже.</Alert>
+			<Alert variant="danger" title={pt(locale, 'thinks.signin.failed')}
+				>{pt(locale, 'thinks.signin.failedText')}</Alert
+			>
 		{:else if !auth}
 			<Skeleton height="2.5rem" width="14rem" />
 		{:else if auth.dev}
-			<a class="signin__dev" href="/account/login?dev=1">Войти как {auth.dev} (dev)</a>
+			<a class="signin__dev" href="/account/login?dev=1">{pt(locale, 'thinks.signin.dev', { id: auth.dev })}</a>
 		{:else}
 			<div class="signin__widget" bind:this={widget}></div>
 		{/if}
-		<p class="signin__note">
-			Telegram передаст серверу только твой id и&nbsp;имя, без&nbsp;пароля и&nbsp;переписки.
-		</p>
+		<p class="signin__note">{pt(locale, 'thinks.signin.note')}</p>
 	</Card>
 </div>
 

@@ -11,6 +11,8 @@ export type BuildState = 'queued' | 'building' | 'ready' | 'failed'
 export type BuildStatus = {
 	state: BuildState
 	message: string
+	/** Тот же текст по-английски, если сервер его знает: ошибки сборщика остаются как есть. */
+	messageEn?: string
 	updatedAt: number
 	/** Пройденный шаг сборки из BUILD_STEPS, пока state -- building. */
 	step?: number
@@ -302,6 +304,9 @@ export class Builds {
 
 	private setStatus(userId: string, state: BuildState, message: string, step?: number): void {
 		const status: BuildStatus = { state, message, updatedAt: Date.now() }
+		const en = englishOf(message)
+
+		if (en) status.messageEn = en
 
 		if (step !== undefined) Object.assign(status, { step, steps: BUILD_STEPS.length })
 
@@ -313,6 +318,42 @@ export class Builds {
 			log.error(`Не удалось записать статус сборки ${userId}`, { state, error: String(err) })
 		}
 	}
+}
+
+// Статус пишется на диск один на все языки, поэтому кладём рядом английский текст для тех
+// сообщений, что составляет сам сервер. Последняя строка stderr сборщика -- как есть.
+const ENGLISH: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
+	[/^В очереди$/, () => 'In the queue'],
+	[/^Собираю корпус$/, () => 'Building the corpus'],
+	[/^Корпус собран$/, () => 'The corpus is built'],
+	[/^Сервер перезапустился, загрузи заново$/, () => 'The server restarted, upload again'],
+	[/^Сборке не хватило памяти$/, () => 'The build ran out of memory'],
+	[
+		/^Сборку остановила система, скорее всего не хватило памяти$/,
+		() => 'The system stopped the build, most likely out of memory',
+	],
+	[/^Сборка прервана сигналом (\S+)$/, (m) => `The build was stopped by signal ${m[1]}`],
+	[/^Сборка завершилась с кодом (\S+)$/, (m) => `The build exited with code ${m[1]}`],
+	[/^Не удалось запустить сборку: (.*)$/, (m) => `Could not start the build: ${m[1]}`],
+	...BUILD_STEPS.map((step, i): [RegExp, () => string] => [new RegExp(`^${step}$`), () => BUILD_STEPS_EN[i] ?? step]),
+]
+
+const BUILD_STEPS_EN = [
+	'Reading the export',
+	'Found the owner of the archive',
+	'Collecting replies',
+	'Writing search indexes',
+	'Building the style profile',
+]
+
+export function englishOf(message: string): string | undefined {
+	for (const [re, en] of ENGLISH) {
+		const m = message.match(re)
+
+		if (m) return en(m)
+	}
+
+	return undefined
 }
 
 /** A SQLite file and the WAL files that belong to it. */

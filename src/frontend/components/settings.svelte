@@ -11,8 +11,9 @@
 	import type { AccountState } from '#thinks/http/app'
 	import SectionHeading from './section-heading.svelte'
 	import { post } from '#frontend/lib/api.ts'
+	import { pt } from '@aimuzov/infra-mcp-kit/astro/lib/i18n.ts'
 
-	let { account }: { account: AccountState } = $props()
+	let { account, locale = 'ru' }: { account: AccountState; locale?: string } = $props()
 
 	// Форма держит свою копию: опрос статуса сборки не должен затирать то, что человек печатает.
 	// svelte-ignore state_referenced_locally
@@ -50,43 +51,44 @@
 </script>
 
 <Card>
-	<SectionHeading icon={SlidersHorizontal} text="Настройки" />
+	<SectionHeading icon={SlidersHorizontal} text={pt(locale, 'thinks.settings')} />
 	<form class="settings" onsubmit={save} oninput={() => (saved = false)}>
 		<section class="settings__group">
-			<h3 class="settings__title">Как ты пишешь</h3>
-			<p class="settings__note">Применяется сразу, без&nbsp;новой сборки.</p>
-			<Field label="Знаки, которые ты не набираешь, и замена" for="never-marks">
+			<h3 class="settings__title">{pt(locale, 'thinks.settings.writing')}</h3>
+			<p class="settings__note">{pt(locale, 'thinks.settings.now')}</p>
+			<Field label={pt(locale, 'thinks.settings.neverMarks')} for="never-marks" {locale}>
 				<Input id="never-marks" name="neverMarks" placeholder={'—:--,…:...,«:",»:"'} bind:value={neverMarks} />
 			</Field>
 		</section>
 
 		<section class="settings__group">
-			<h3 class="settings__title">Что попадает в&nbsp;корпус</h3>
-			<p class="settings__note">Применяется со&nbsp;следующей сборки.</p>
-			<Field label="Чаты, которые не попадут в корпус, через запятую" for="chat-stop-list">
+			<h3 class="settings__title">{pt(locale, 'thinks.settings.corpus')}</h3>
+			<p class="settings__note">{pt(locale, 'thinks.settings.nextBuild')}</p>
+			<Field label={pt(locale, 'thinks.settings.stopList')} for="chat-stop-list" {locale}>
 				<Input id="chat-stop-list" name="chatStopList" bind:value={chatStopList} />
 			</Field>
-			<Field label="Сколько последних лет считать «как я пишу сейчас»" for="recent-years">
+			<Field label={pt(locale, 'thinks.settings.recent')} for="recent-years" {locale}>
 				<Input id="recent-years" name="recentYears" type="number" min="1" max="20" bind:value={recentYears} />
 			</Field>
 		</section>
 
 		<section class="settings__group">
-			<h3 class="settings__title">Голос</h3>
+			<h3 class="settings__title">{pt(locale, 'thinks.settings.voice')}</h3>
 			<label class="settings__check">
 				<input type="checkbox" name="voice" bind:checked={voice} />
-				<span>Claude говорит со&nbsp;мной моим голосом</span>
+				<span>{pt(locale, 'thinks.settings.voiceOn')}</span>
 			</label>
-			<p class="settings__note">
-				Включается с&nbsp;нового чата. Если Claude всё равно пишет по-своему, клиент не&nbsp;передаёт ему
-				настройки коннектора: выбери в&nbsp;чате промпт «Говори как я» из&nbsp;меню коннектора.
-			</p>
+			<p class="settings__note">{pt(locale, 'thinks.settings.voiceNote')}</p>
 		</section>
 
 		{#if error}<Alert variant="danger">{error}</Alert>{/if}
 		<div class="actions">
-			<Button type="submit" disabled={saving}>{saving ? 'Сохраняю…' : 'Сохранить'}</Button>
-			{#if saved}<span class="settings__saved" role="status"><Check size={16} /> Сохранено</span>{/if}
+			<Button type="submit" disabled={saving}
+				>{saving ? pt(locale, 'thinks.settings.saving') : pt(locale, 'thinks.settings.save')}</Button
+			>
+			{#if saved}<span class="settings__saved" role="status"
+					><Check size={16} /> {pt(locale, 'thinks.settings.saved')}</span
+				>{/if}
 		</div>
 	</form>
 </Card>

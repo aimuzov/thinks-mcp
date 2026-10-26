@@ -26,7 +26,9 @@ import {
 	type Route,
 	type TokenClaims,
 } from '@aimuzov/infra-mcp-kit/http'
+import { localizePath, requestLocale } from '@aimuzov/infra-mcp-kit/i18n'
 
+import { say } from '#thinks/http/texts'
 import { createServer } from '#thinks/mcp/server'
 
 import { migrateAuthDb } from './auth-db.ts'
@@ -169,16 +171,15 @@ function accountTable(
 
 			if (!login) {
 				return redirect(
-					errorPage({
-						code: 'login',
-						title: 'Telegram не подтвердил вход',
-						message: 'Попробуй войти ещё раз.',
-					}),
+					errorPage(
+						{ code: 'login', title: say(request, 'loginFailed'), message: say(request, 'loginAgain') },
+						requestLocale(request),
+					),
 				)
 			}
 
 			return redirect(
-				'/account',
+				localizePath('/account', requestLocale(request)),
 				await session.cookie({ sub: login.id, name: login.firstName || login.username }),
 			)
 		},
@@ -190,12 +191,12 @@ function accountTable(
 			const userId = String(claims.sub)
 
 			if (Number(request.headers.get('content-length')) > cfg.maxUploadBytes) {
-				return apiError(413, 'too_large', 'Файл больше допустимого')
+				return apiError(413, 'too_large', say(request, 'tooLarge'))
 			}
 
 			// Две загрузки одного пользователя писали бы в один и тот же файл.
 			if (!builds.beginUpload(userId)) {
-				return apiError(409, 'busy', 'Предыдущая загрузка или сборка ещё не закончилась')
+				return apiError(409, 'busy', say(request, 'busy'))
 			}
 
 			try {
@@ -209,7 +210,7 @@ function accountTable(
 			} catch (err) {
 				builds.discardUpload(userId)
 
-				return uploadFailed(err, userId)
+				return uploadFailed(err, userId, request)
 			} finally {
 				builds.endUpload(userId)
 			}
@@ -222,7 +223,7 @@ function accountTable(
 		'POST /account/settings': guarded(async (request, claims) => {
 			// Старая форма кабинета слала urlencoded, и вкладка, открытая до деплоя, пришла бы
 			// с пустым телом: настройки сбросились бы к умолчаниям.
-			if (!isJson(request)) return apiError(415, 'json_only', 'Обнови страницу кабинета и сохрани ещё раз')
+			if (!isJson(request)) return apiError(415, 'json_only', say(request, 'jsonOnly'))
 
 			let body: Record<string, unknown>
 
@@ -230,9 +231,10 @@ function accountTable(
 				body = (JSON.parse((await readBody(request, SETTINGS_LIMIT)) || '{}') ?? {}) as Record<string, unknown>
 			} catch (err) {
 				// Битое или слишком большое тело прислал клиент, сервер тут ни при чём.
-				if (err instanceof InvalidRequestError) return apiError(413, 'too_large', 'Слишком большой запрос')
+				if (err instanceof InvalidRequestError)
+					return apiError(413, 'too_large', say(request, 'requestTooLarge'))
 
-				return apiError(400, 'bad_json', 'Не удалось прочитать настройки')
+				return apiError(400, 'bad_json', say(request, 'badJson'))
 			}
 
 			const userId = String(claims.sub)
@@ -248,12 +250,12 @@ function accountTable(
 			return sendJson(state(userId, nameOf(claims)))
 		}),
 
-		'POST /account/delete': guarded((_request, claims) => {
+		'POST /account/delete': guarded((request, claims) => {
 			const userId = String(claims.sub)
 
 			// Идущую сборку не остановить, а её статус и корпус легли бы в уже
 			// удалённый каталог.
-			if (!builds.cancel(userId)) return apiError(409, 'busy', 'Дождись конца сборки, потом удаляй аккаунт')
+			if (!builds.cancel(userId)) return apiError(409, 'busy', say(request, 'deleteBusy'))
 
 			// Токены MCP-клиентов живут дольше сессии кабинета: без отзыва
 			// клиент продолжил бы ходить в удалённый аккаунт.
@@ -293,19 +295,19 @@ function sizeLimit(max: number): Transform {
 }
 
 /** Only an oversized file is the user's fault; a full disk is ours. */
-function uploadFailed(err: unknown, userId: string): Response {
-	if (err instanceof TooLarge) return apiError(413, 'too_large', 'Файл больше допустимого')
+function uploadFailed(err: unknown, userId: string, request: Request): Response {
+	if (err instanceof TooLarge) return apiError(413, 'too_large', say(request, 'tooLarge'))
 
 	const code = (err as NodeJS.ErrnoException).code
 
 	// Клиент оборвал загрузку: ответ до него уже не дойдёт, и это не сбой сервера.
 	if (code === 'ECONNRESET' || code === 'ERR_STREAM_PREMATURE_CLOSE' || code === 'ABORT_ERR') {
-		return apiError(400, 'aborted', 'Загрузка оборвалась')
+		return apiError(400, 'aborted', say(request, 'aborted'))
 	}
 
 	log.error(`Не удалось сохранить загрузку ${userId}`, { error: String(err) })
 
-	return apiError(500, 'upload_failed', 'Не удалось сохранить файл, попробуй позже')
+	return apiError(500, 'upload_failed', say(request, 'uploadFailed'))
 }
 
 /** Run the hosted server. Configured entirely from the environment. */
