@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0](https://github.com/aimuzov/thinks-mcp/compare/v0.9.4...v0.10.0) (2026-10-26)
+
+
+### Features
+
+* serve the pages and the account in English too ([ec2725e](https://github.com/aimuzov/thinks-mcp/commit/ec2725e1816fe2c97546f71747b1485567631f1e))
+* serve the pages and the account in English too ([f9415ee](https://github.com/aimuzov/thinks-mcp/commit/f9415ee8b5104e126b1fae9c62c73e0185787e06))
+
 ## [0.9.4](https://github.com/aimuzov/thinks-mcp/compare/v0.9.3...v0.9.4) (2026-10-26)
 
 
