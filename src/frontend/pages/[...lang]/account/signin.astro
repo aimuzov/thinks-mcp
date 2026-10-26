@@ -1,13 +1,20 @@
 ---
+import { localeOfPath } from '@aimuzov/infra-site-kit/i18n.js'
+
 import Layout from '@aimuzov/infra-mcp-kit/astro/layout.astro'
+import { localePaths, pt } from '@aimuzov/infra-mcp-kit/astro/lib/i18n.ts'
 
 import Signin from '#frontend/components/signin.svelte'
+
+export const getStaticPaths = localePaths
+
+const locale = localeOfPath(Astro.url.pathname)
 
 // Виджет Telegram нужен только здесь, поэтому и его источники пускаем только на этой странице.
 Astro.csp?.insertScriptResource('https://telegram.org')
 Astro.csp?.insertDirective('frame-src https://oauth.telegram.org')
 ---
 
-<Layout title="Вход в кабинет thinks" screen="consent">
-	<Signin client:load />
+<Layout title={pt(locale, 'thinks.signinTitle')} screen="consent">
+	<Signin client:load {locale} />
 </Layout>

@@ -70,13 +70,21 @@ after(async () => {
 	rmSync(dataDir, { recursive: true, force: true })
 })
 
-async function open(scheme: 'light' | 'dark', width = 1280): Promise<{ context: BrowserContext; page: Page }> {
-	const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: scheme })
+async function open(
+	scheme: 'light' | 'dark',
+	width = 1280,
+	locale?: string,
+): Promise<{ context: BrowserContext; page: Page }> {
+	// `locale` браузера уходит в Accept-Language: по нему сервер выбирает язык страниц.
+	const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: scheme, locale })
 	const page = await context.newPage()
 
 	page.on('console', (message) => {
 		// 401 от /account/state у гостя -- так AccountShell узнаёт, что показать экран входа.
 		if (/status of 401/.test(message.text())) return
+
+		// 415 вызывает тест ошибки API: настройки без JSON отвергаются нарочно.
+		if (/status of 415/.test(message.text())) return
 
 		if (message.type() === 'error' || /Refused to/.test(message.text())) problems.push(message.text())
 	})
@@ -188,6 +196,90 @@ describe('страницы thinks', () => {
 
 				await context.close()
 			}
+		}
+	})
+
+	test('английский браузер: лендинг, вход, кабинет и шаги сборки по-английски', async () => {
+		const { context, page } = await open('light', 1280, 'en-US')
+
+		await page.goto(`${http.base}/`)
+		assert.equal(new URL(page.url()).pathname, '/en/')
+		assert.equal(await page.locator('html').getAttribute('lang'), 'en')
+		assert.equal(await page.getByRole('link', { name: 'Open the account' }).getAttribute('href'), '/en/account')
+		await page.getByRole('link', { name: 'Open the account' }).click()
+		await page.getByRole('link', { name: 'Sign in' }).click()
+		await page.waitForURL('**/en/account/signin')
+		await page.getByRole('link', { name: /Sign in as 1/ }).click()
+		await page.waitForURL('**/en/account')
+		await page.getByRole('heading', { name: 'Hi, dev' }).waitFor()
+
+		status('building', { step: 3, steps: BUILD_STEPS.length })
+		await page.reload()
+		await page.getByText('Collecting replies').waitFor()
+
+		status('failed', {
+			message: 'Сервер перезапустился, загрузи заново',
+			messageEn: 'The server restarted, upload again',
+		})
+
+		await page.reload()
+		await page.getByText('The server restarted, upload again').waitFor()
+		rmSync(users.dir(USER), { recursive: true, force: true })
+		await context.close()
+	})
+
+	test('ошибка API кабинета приходит на языке страницы', async () => {
+		const { context, page } = await open('light', 1280, 'en-US')
+
+		await page.goto(`${http.base}/en/account/signin`)
+		await page.getByRole('link', { name: /Sign in as 1/ }).click()
+		await page.waitForURL('**/en/account')
+
+		const res = await page.evaluate(async () => {
+			const r = await fetch('/account/settings', {
+				method: 'POST',
+				body: 'x',
+				headers: { accept: 'application/json' },
+			})
+
+			return (await r.json()) as { error: { message: string } }
+		})
+
+		assert.equal(res.error.message, 'Reload the account page and save again')
+		await context.close()
+	})
+
+	test('английский кабинет во всех состояниях сборки в обеих темах', async () => {
+		const states: Array<[string, () => void]> = [
+			['empty', () => rmSync(users.dir(USER), { recursive: true, force: true })],
+			['building', () => status('building', { step: 3, steps: BUILD_STEPS.length })],
+			[
+				'ready',
+				() => {
+					status('ready', { message: 'Корпус собран', messageEn: 'The corpus is built' })
+					writeFileSync(users.config(USER).dbPath, '')
+				},
+			],
+		]
+
+		for (const scheme of ['light', 'dark'] as const) {
+			const { context, page } = await open(scheme, 1280, 'en-US')
+
+			await page.goto(`${http.base}/`)
+			await shot(page, `en.landing.${scheme}`)
+			await page.goto(`${http.base}/en/account/signin`)
+			await shot(page, `en.signin.${scheme}`)
+			await page.getByRole('link', { name: /Sign in as 1/ }).click()
+			await page.waitForURL('**/en/account')
+
+			for (const [name, apply] of states) {
+				apply()
+				await page.reload()
+				await page.getByRole('heading', { name: 'Hi, dev' }).waitFor()
+				await shot(page, `en.account-${name}.${scheme}.desktop`)
+			}
+
+			await context.close()
 		}
 	})
 

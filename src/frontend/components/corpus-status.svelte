@@ -7,8 +7,13 @@
 	import Card from '@aimuzov/infra-site-kit/ui/card.svelte'
 
 	import type { AccountState } from '#thinks/http/app'
+	import { pt } from '@aimuzov/infra-mcp-kit/astro/lib/i18n.ts'
 
-	let { account, reload }: { account: AccountState; reload: () => Promise<void> } = $props()
+	let {
+		account,
+		reload,
+		locale = 'ru',
+	}: { account: AccountState; reload: () => Promise<void>; locale?: string } = $props()
 
 	const kind = $derived.by(() => {
 		const s = account.status?.state
@@ -32,7 +37,7 @@
 	})
 
 	const when = (ms: number) =>
-		new Date(ms).toLocaleString('ru', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+		new Date(ms).toLocaleString(locale, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
 </script>
 
 <Card>
@@ -45,34 +50,33 @@
 		</span>
 		<div class="status__body">
 			{#if kind === 'ready'}
-				<h2 class="status__title">Корпус собран</h2>
+				<h2 class="status__title">{pt(locale, 'thinks.status.ready')}</h2>
 				<p class="muted">
-					Коннектор готов к&nbsp;работе{#if account.status}, сборка от&nbsp;{when(
-							account.status.updatedAt,
-						)}{/if}.
+					{pt(locale, 'thinks.status.readyText')}{#if account.status}{pt(locale, 'thinks.status.readyAt', {
+							when: when(account.status.updatedAt),
+						})}{/if}.
 				</p>
 			{:else if kind === 'failed'}
-				<h2 class="status__title">Сборка не&nbsp;удалась</h2>
-				<p class="muted">{account.status?.message}</p>
+				<h2 class="status__title">{pt(locale, 'thinks.status.failed')}</h2>
+				<p class="muted">{(locale === 'en' && account.status?.messageEn) || account.status?.message}</p>
 				<p class="muted">
-					{account.hasCorpus
-						? 'Прежний корпус остался, коннектор работает на нём.'
-						: 'Загрузи выгрузку ещё раз.'}
+					{account.hasCorpus ? pt(locale, 'thinks.status.kept') : pt(locale, 'thinks.status.again')}
 				</p>
 			{:else if kind === 'queued'}
-				<h2 class="status__title">Корпус в&nbsp;очереди</h2>
-				<p class="muted">Сервер собирает по&nbsp;одному корпусу за&nbsp;раз, твой следующий.</p>
+				<h2 class="status__title">{pt(locale, 'thinks.status.queued')}</h2>
+				<p class="muted">{pt(locale, 'thinks.status.queuedText')}</p>
 				<div class="bar bar--wait" aria-hidden="true"><span></span></div>
 			{:else if kind === 'building'}
-				<h2 class="status__title">Корпус собирается</h2>
+				<h2 class="status__title">{pt(locale, 'thinks.status.building')}</h2>
+				<!-- Шаг берём по номеру из словаря: сервер хранит его текст по-русски. -->
 				<p class="muted">
-					{step > 0 ? account.status?.message : 'Запускаю сборку'}. Шаг&nbsp;{Math.max(step, 1)} из&nbsp;{steps},
-					большая выгрузка собирается несколько минут.
+					{step > 0 ? pt(locale, `thinks.step.${step}`) : pt(locale, 'thinks.status.starting')}.
+					{pt(locale, 'thinks.status.step', { step: Math.max(step, 1), steps })}
 				</p>
 				<div
 					class="bar"
 					role="progressbar"
-					aria-label="Сборка корпуса"
+					aria-label={pt(locale, 'thinks.status.buildLabel')}
 					aria-valuemin={0}
 					aria-valuemax={steps}
 					aria-valuenow={step}
@@ -80,10 +84,8 @@
 					<span style:--done={`${(Math.max(step, 0.3) / steps) * 100}%`}></span>
 				</div>
 			{:else}
-				<h2 class="status__title">Корпуса пока нет</h2>
-				<p class="muted">
-					Загрузи выгрузку из&nbsp;Telegram ниже. После сборки коннектор начнёт отвечать твоим голосом.
-				</p>
+				<h2 class="status__title">{pt(locale, 'thinks.status.empty')}</h2>
+				<p class="muted">{pt(locale, 'thinks.status.emptyText')}</p>
 			{/if}
 		</div>
 	</div>

@@ -1,15 +1,20 @@
 ---
 // Лендинг кита плюс дорога в кабинет: у thinks без него коннектор пуст, корпус собирают там.
 // Своего слота у лендинга кита нет, поэтому страница перекрыта целиком (`override` в astro.config).
+import { localeOfPath } from '@aimuzov/infra-site-kit/i18n.js'
 import config from 'virtual:infra-mcp-kit/pages'
 
 import Connect from '@aimuzov/infra-mcp-kit/astro/components/connect.svelte'
 import Layout from '@aimuzov/infra-mcp-kit/astro/layout.astro'
+import { localePaths, own } from '@aimuzov/infra-mcp-kit/astro/lib/i18n.ts'
 
 import LandingAccount from '#frontend/components/landing-account.svelte'
 import LandingTools from '#frontend/components/landing-tools.svelte'
 
+export const getStaticPaths = localePaths
+
 const { service } = config
+const locale = localeOfPath(Astro.url.pathname)
 ---
 
 <Layout title={service.name} screen="landing">
@@ -17,10 +22,10 @@ const { service } = config
 		<h1 class="glitch" data-text={service.name}>
 			{service.name}
 		</h1>
-		<p class="tagline">{service.tagline}</p>
-		<p class="lead">{service.lead}</p>
+		<p class="tagline">{own(locale, 'service.tagline', service.tagline)}</p>
+		<p class="lead">{own(locale, 'service.lead', service.lead)}</p>
 	</section>
-	<LandingAccount />
-	<Connect client:load name={service.name} />
-	<LandingTools tools={service.tools ?? []} />
+	<LandingAccount {locale} />
+	<Connect client:load name={service.name} {locale} />
+	<LandingTools tools={service.tools ?? []} {locale} />
 </Layout>

@@ -8,7 +8,15 @@ import { fileURLToPath } from 'node:url'
 
 import { makeDump } from '#thinks/testing/fixtures'
 
-import { BUILD_STEPS, Builds, childRunner, exitMessage, type BuildRunner, type BuildStatus } from './builds.ts'
+import {
+	BUILD_STEPS,
+	Builds,
+	childRunner,
+	englishOf,
+	exitMessage,
+	type BuildRunner,
+	type BuildStatus,
+} from './builds.ts'
 import { Users } from './users.ts'
 
 describe('exitMessage', () => {
@@ -114,7 +122,14 @@ describe('Builds', () => {
 
 		assert.deepEqual(
 			{ ...first!, updatedAt: 0 },
-			{ state: 'building', message: 'Собираю корпус', updatedAt: 0, step: 0, steps: BUILD_STEPS.length },
+			{
+				state: 'building',
+				message: 'Собираю корпус',
+				messageEn: 'Building the corpus',
+				updatedAt: 0,
+				step: 0,
+				steps: BUILD_STEPS.length,
+			},
 		)
 	})
 
@@ -354,3 +369,11 @@ function seedDump(users: Users, builds: Builds, userId: string) {
 
 /** Сообщения сервера набраны с неразрывными пробелами, тесту важны слова. */
 const spaced = (text: string | null) => text?.replace(/\u00a0/g, ' ') ?? null
+
+describe('englishOf', () => {
+	it('переводит сообщения сервера, а вывод сборщика оставляет как есть', () => {
+		assert.equal(englishOf('Сборка прервана сигналом SIGTERM'), 'The build was stopped by signal SIGTERM')
+		assert.equal(englishOf(BUILD_STEPS[0] ?? ''), 'Reading the export')
+		assert.equal(englishOf('Битый JSON'), undefined)
+	})
+})

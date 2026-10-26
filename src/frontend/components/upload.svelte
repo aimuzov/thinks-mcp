@@ -8,8 +8,13 @@
 	import type { AccountState } from '#thinks/http/app'
 	import SectionHeading from './section-heading.svelte'
 	import { readError } from '#frontend/lib/api.ts'
+	import { pt } from '@aimuzov/infra-mcp-kit/astro/lib/i18n.ts'
 
-	let { account, reload }: { account: AccountState; reload: () => Promise<void> } = $props()
+	let {
+		account,
+		reload,
+		locale = 'ru',
+	}: { account: AccountState; reload: () => Promise<void>; locale?: string } = $props()
 
 	let sent = $state<number | null>(null)
 	let error = $state<string | null>(null)
@@ -42,7 +47,7 @@
 		}
 
 		xhr.onerror = () => {
-			error = 'Соединение оборвалось, загрузи файл ещё раз'
+			error = pt(locale, 'thinks.upload.broken')
 			sent = null
 		}
 
@@ -51,25 +56,29 @@
 </script>
 
 <Card>
-	<SectionHeading icon={Upload} text="Выгрузка из Telegram" />
+	<SectionHeading icon={Upload} text={pt(locale, 'thinks.upload')} />
 	<ol class="steps">
 		<li>
-			<b>Экспорт</b><span>Telegram Desktop: Settings → Advanced → Export Telegram data.</span>
+			<b>{pt(locale, 'thinks.upload.export')}</b><span>{pt(locale, 'thinks.upload.exportText')}</span>
 		</li>
 		<li>
-			<b>Формат</b><span>Machine-readable JSON, все медиа выключить: нужен только текст.</span>
+			<b>{pt(locale, 'thinks.upload.format')}</b><span>{pt(locale, 'thinks.upload.formatText')}</span>
 		</li>
 		<li>
-			<b>Загрузка</b><span>Перетащи сюда получившийся <code>result.json</code>.</span>
+			<b>{pt(locale, 'thinks.upload.load')}</b><span
+				>{pt(locale, 'thinks.upload.loadBefore')} <code>result.json</code>{locale === 'ru'
+					? ''
+					: ' here'}.</span
+			>
 		</li>
 	</ol>
 	{#if sent !== null}
 		<div class="upload__progress" role="status" aria-live="polite">
-			<p class="muted">Загружаю выгрузку: {Math.round(sent * 100)}%</p>
+			<p class="muted">{pt(locale, 'thinks.upload.progress', { percent: Math.round(sent * 100) })}</p>
 			<div
 				class="upload__bar"
 				role="progressbar"
-				aria-label="Загрузка выгрузки"
+				aria-label={pt(locale, 'thinks.upload.progressLabel')}
 				aria-valuemin={0}
 				aria-valuemax={100}
 				aria-valuenow={Math.round(sent * 100)}
@@ -83,16 +92,17 @@
 			accept=".json,application/json"
 			maxSize={account.maxUploadBytes}
 			disabled={building}
-			title={building ? 'Дождись конца сборки' : 'Перетащи result.json сюда'}
-			note={`JSON до ${formatSize(account.maxUploadBytes)}`}
-			button="Выбрать файл"
-			label="Выгрузка из Telegram"
+			title={building ? pt(locale, 'thinks.upload.wait') : pt(locale, 'thinks.upload.drop')}
+			note={pt(locale, 'thinks.upload.limit', { size: formatSize(account.maxUploadBytes, locale) })}
+			button={pt(locale, 'thinks.upload.choose')}
+			label={pt(locale, 'thinks.upload')}
+			{locale}
 			{error}
 			onfile={send}
 		/>
 	{/if}
 	<p class="upload__note">
-		Выгрузка удаляется сразу после сборки. Новая сборка заменяет старый корпус, только если прошла успешно.
+		{pt(locale, 'thinks.upload.note')}
 	</p>
 </Card>
 

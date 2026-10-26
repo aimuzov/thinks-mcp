@@ -1,0 +1,16 @@
+---
+import { localeOfPath } from '@aimuzov/infra-site-kit/i18n.js'
+
+import Layout from '@aimuzov/infra-mcp-kit/astro/layout.astro'
+import { localePaths, pt } from '@aimuzov/infra-mcp-kit/astro/lib/i18n.ts'
+
+import Account from '#frontend/components/account.svelte'
+
+export const getStaticPaths = localePaths
+
+const locale = localeOfPath(Astro.url.pathname)
+---
+
+<Layout title={pt(locale, 'thinks.accountTitle')} screen="account">
+	<Account client:load {locale} />
+</Layout>
