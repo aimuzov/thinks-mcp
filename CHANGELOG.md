@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.3](https://github.com/aimuzov/thinks-mcp/compare/v0.9.2...v0.9.3) (2026-10-26)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 3.0.2 so the theme peek stops lagging ([c00c70b](https://github.com/aimuzov/thinks-mcp/commit/c00c70bd75fbbbaf428aea8a461da518ca9dc664))
+* **deps:** move to infra-mcp-kit 3.0.2 so the theme peek stops lagging ([8c0ee71](https://github.com/aimuzov/thinks-mcp/commit/8c0ee71144bffdb187e4ef008fd0e5d4ff49f596))
+
 ## [0.9.2](https://github.com/aimuzov/thinks-mcp/compare/v0.9.1...v0.9.2) (2026-10-25)
 
 
