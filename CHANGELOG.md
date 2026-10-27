@@ -4,6 +4,13 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0](https://github.com/aimuzov/thinks-mcp/compare/v0.10.1...v0.11.0) (2026-10-27)
+
+
+### Features
+
+* report errors to Sentry when SENTRY_DSN is set ([ec3ec4f](https://github.com/aimuzov/thinks-mcp/commit/ec3ec4fa05d0ed718992cea403bd4527e549ba28))
+
 ## [0.10.1](https://github.com/aimuzov/thinks-mcp/compare/v0.10.0...v0.10.1) (2026-10-27)
 
 
