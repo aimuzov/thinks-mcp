@@ -9,7 +9,6 @@ writes the entries from conventional commits; earlier ones follow
 
 ### Features
 
-* report errors to Sentry when SENTRY_DSN is set ([86da74b](https://github.com/aimuzov/thinks-mcp/commit/86da74b77547d898415556ee8b61ce3a74201a33))
 * report errors to Sentry when SENTRY_DSN is set ([ec3ec4f](https://github.com/aimuzov/thinks-mcp/commit/ec3ec4fa05d0ed718992cea403bd4527e549ba28))
 
 ## [0.10.1](https://github.com/aimuzov/thinks-mcp/compare/v0.10.0...v0.10.1) (2026-10-27)
