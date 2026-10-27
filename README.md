@@ -343,6 +343,7 @@ said.
 | `THINKS_HOLDOUT`                | `20`                                                    | pairs held out for the blind check                                       |
 | `THINKS_VOICE`                  | empty                                                   | `1` turns the voice mode on                                              |
 | `LOG_LEVEL`                     | `info`                                                  | `error`, `warn`, `info` or `debug`                                       |
+| `SENTRY_DSN`                    | empty                                                   | send errors to Sentry, only the message and the stack                    |
 
 The hosted connector, `serve --http`, is configured by the environment only, see
 [.env.example](.env.example):

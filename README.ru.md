@@ -341,6 +341,7 @@ npm run build
 | `THINKS_HOLDOUT`                | `20`                                                     | сколько пар отложить на слепую проверку                                   |
 | `THINKS_VOICE`                  | пусто                                                    | `1` включает голосовой режим                                              |
 | `LOG_LEVEL`                     | `info`                                                   | `error`, `warn`, `info` или `debug`                                       |
+| `SENTRY_DSN`                    | пусто                                                    | отправлять ошибки в Sentry, только текст и стек                           |
 
 Размещённый коннектор, `serve --http`, настраивается только окружением, см.
 [.env.example](.env.example):
