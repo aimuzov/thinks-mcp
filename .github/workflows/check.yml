@@ -21,18 +21,10 @@ jobs:
         with:
           docker: deploy/Dockerfile
           coverage-lines: 95
-      # Кабинет и вход в настоящем Chromium на собранной статике: CSP режет инлайн-код
-      # молча, это видно только в консоли браузера. Браузер кэшируется по версии
-      # Playwright, системные библиотеки ставятся из apt каждый прогон.
+          # Кабинет и вход в настоящем Chromium на собранной статике: CSP режет инлайн-код
+          # молча, это видно только в консоли браузера. Chromium ставит и кэширует кит.
+          ui: true
       # Снимки не сравниваем: шрифты на раннере другие, они уходят артефактом.
-      - id: playwright
-        run: echo "version=$(npm ls playwright --json | jq -r '.dependencies.playwright.version')" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:ui
       - if: always()
         uses: actions/upload-artifact@v4
         with:
