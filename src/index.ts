@@ -46,7 +46,8 @@ const USAGE = `Usage: thinks-mcp [serve|build <dump.json>|code <репозито
   THINKS_NEVER_MARKS    знаки, которые не набираю, и замена:
                         —:--,…:...,→:=>,«:",»:"
   THINKS_BURST_WINDOW, THINKS_LONGFORM_MIN, THINKS_HOLDOUT
-  SENTRY_DSN        отправлять ошибки в Sentry, только текст и стек`
+  SENTRY_DSN        отправлять ошибки в Sentry: текст, стек и теги, без аргументов
+                    и ответов инструментов`
 
 function build(args: string[]): void {
 	const cfg = loadConfig()
