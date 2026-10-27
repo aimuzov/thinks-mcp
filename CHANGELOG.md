@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.1](https://github.com/aimuzov/thinks-mcp/compare/v0.11.0...v0.11.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 3.4.0 and infra-site-kit 5.8.1 ([d232784](https://github.com/aimuzov/thinks-mcp/commit/d2327844fd07eca1f495b2f03b824d70b5d5b661))
+* **deps:** move to infra-mcp-kit 3.4.0 and infra-site-kit 5.8.1 ([ffcd984](https://github.com/aimuzov/thinks-mcp/commit/ffcd98407650da0ae03f48f5be05a54ccaa15d34))
+
 ## [0.11.0](https://github.com/aimuzov/thinks-mcp/compare/v0.10.1...v0.11.0) (2026-10-27)
 
 
