@@ -1,6 +1,6 @@
 {
 	"name": "@aimuzov/thinks-mcp",
-	"version": "0.10.1",
+	"version": "0.11.0",
 	"description": "MCP server that writes, replies and rephrases in your own voice, learned from a Telegram export. Hands the calling model a measured style profile and your real messages — no API keys, no generation of its own.",
 	"keywords": [
 		"mcp",
@@ -63,7 +63,7 @@
 		"test:ui": "npm run build && node --conditions=thinks-source --test e2e/*.e2e.ts"
 	},
 	"dependencies": {
-		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v3.2.1",
+		"@aimuzov/infra-mcp-kit": "github:aimuzov/infra-mcp-kit#v3.3.0",
 		"zod": "4.6.7"
 	},
 	"devDependencies": {
