@@ -4,6 +4,14 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.2](https://github.com/aimuzov/thinks-mcp/compare/v0.11.1...v0.11.2) (2026-10-28)
+
+
+### Bug Fixes
+
+* **deps:** move to infra-mcp-kit 3.4.1 with the strict Sentry events ([24c77e0](https://github.com/aimuzov/thinks-mcp/commit/24c77e03d7692b1810e06a1452b7393520114b6e))
+* **deps:** move to infra-mcp-kit 3.4.1 with the strict Sentry events ([34f1baa](https://github.com/aimuzov/thinks-mcp/commit/34f1baacef4dc8c2cb5620d61a7f5fe56bcf8dd8))
+
 ## [0.11.1](https://github.com/aimuzov/thinks-mcp/compare/v0.11.0...v0.11.1) (2026-10-27)
 
 
