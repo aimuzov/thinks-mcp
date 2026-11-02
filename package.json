@@ -71,7 +71,7 @@
 		"@astrojs/check": "0.9.12",
 		"@astrojs/svelte": "9.1.2",
 		"@lucide/svelte": "1.39.0",
-		"@modelcontextprotocol/sdk": "1.32.1",
+		"@modelcontextprotocol/sdk": "1.32.2",
 		"@types/node": "26.6.5",
 		"astro": "7.4.4",
 		"oxlint": "1.87.0",
