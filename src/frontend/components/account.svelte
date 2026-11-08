@@ -15,6 +15,7 @@
 	import type { AccountState } from '#thinks/http/app'
 	import SectionHeading from './section-heading.svelte'
 	import { post } from '#frontend/lib/api.ts'
+	import ClientSetup from './client-setup.svelte'
 	import CorpusStatus from './corpus-status.svelte'
 	import Settings from './settings.svelte'
 	import Upload from './upload.svelte'
@@ -46,6 +47,7 @@
 			<CorpusStatus {account} {reload} {locale} />
 			<Upload {account} {reload} {locale} />
 			<Connect name="thinks" {locale} />
+			<ClientSetup {locale} />
 			<Settings {account} {locale} />
 			<Card tone="danger">
 				<SectionHeading icon={Database} text={pt(locale, 'thinks.data')} />

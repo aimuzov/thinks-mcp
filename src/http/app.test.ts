@@ -115,6 +115,14 @@ function seedCorpus(userId: string) {
 const brief = { name: 'write_as_me', arguments: { brief: 'напиши, что задержусь' } }
 
 describe('OAuth', () => {
+	it('issues tokens for the Cursor and VS Code callbacks', async () => {
+		for (const redirectUri of ['https://www.cursor.com/agents/mcp/oauth/callback', 'https://vscode.dev/redirect']) {
+			const flow = await oauthFlow({ base: http.base, login: widget(OWNER), redirectUri })
+
+			assert.ok(flow.tokens.access_token)
+		}
+	})
+
 	it('issues tokens for a Telegram login, and a code works once', async () => {
 		const flow = await oauthFlow({ base: http.base, login: widget(OWNER) })
 

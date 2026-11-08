@@ -131,6 +131,24 @@ describe('страницы thinks', () => {
 		await context.close()
 	})
 
+	test('shows setup for other MCP clients with the current server URL', async () => {
+		const { context, page } = await open('light')
+
+		try {
+			await page.goto(`${http.base}/account/login?dev=1`)
+			await page.getByText('Codex', { exact: true }).click()
+			await page.getByText(`codex mcp add thinks --url ${http.base}/mcp`, { exact: true }).waitFor()
+			await page.getByText('Cursor', { exact: true }).click()
+			await page.getByText(JSON.stringify({ mcpServers: { thinks: { url: `${http.base}/mcp` } } })).waitFor()
+			await page.getByText('VS Code / GitHub Copilot', { exact: true }).click()
+			await page.getByText(/Chat: Open Customizations/).waitFor()
+			await page.getByText('OpenCode', { exact: true }).click()
+			await page.getByText('opencode mcp auth thinks', { exact: true }).waitFor()
+		} finally {
+			await context.close()
+		}
+	})
+
 	test('загрузка выгрузки доходит до собранного корпуса', async () => {
 		const { context, page } = await open('light')
 
