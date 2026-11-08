@@ -77,7 +77,15 @@ export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }:
 	const tokens = new Tokens({ secret: http.authSecret, issuer: http.publicUrl.href })
 
 	return createHttpApp({
-		config: http,
+		config: {
+			...http,
+			allowedRedirectUris: [
+				...http.allowedRedirectUris,
+				'https://www.cursor.com/agents/mcp/oauth/callback',
+				'https://insiders.vscode.dev/redirect',
+				'https://vscode.dev/redirect',
+			],
+		},
 		service: SERVICE,
 		publicDir,
 		auth: {

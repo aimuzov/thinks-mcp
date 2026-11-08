@@ -4,6 +4,15 @@ const NB = ' '
 
 export default {
 	ru: {
+		'thinks.clients.title': 'Другие клиенты',
+		'thinks.clients.codex': 'Если Codex не предложит войти, запусти команду входа.',
+		'thinks.clients.cursor':
+			'Сохрани пример в ~/.cursor/mcp.json. Если файл уже есть, добавь thinks в mcpServers. Войди, когда Cursor предложит.',
+		'thinks.clients.vscode':
+			'Открой Chat: Open Customizations. В MCP Servers нажми Add Server и выбери HTTP. Вставь адрес MCP выше, назови сервер thinks и войди, когда VS Code предложит.',
+		'thinks.clients.opencode':
+			'Сохрани пример в ~/.config/opencode/opencode.json. Если файл уже есть, добавь thinks в mcp. Для входа запусти команду ниже.',
+
 		'thinks.accountTitle': 'Кабинет thinks',
 		'thinks.signinTitle': 'Вход в кабинет thinks',
 
@@ -84,6 +93,15 @@ export default {
 		'thinks.api.status': 'Сервер ответил {status}, попробуй позже',
 	},
 	en: {
+		'thinks.clients.title': 'Other clients',
+		'thinks.clients.codex': 'If Codex does not prompt you to sign in, run the sign-in command.',
+		'thinks.clients.cursor':
+			'Save the example to ~/.cursor/mcp.json. If the file already exists, add thinks under mcpServers. Sign in when Cursor prompts you.',
+		'thinks.clients.vscode':
+			'Open Chat: Open Customizations. Under MCP Servers, choose Add Server and HTTP. Paste the MCP URL above, name the server thinks, and sign in when VS Code prompts you.',
+		'thinks.clients.opencode':
+			'Save the example to ~/.config/opencode/opencode.json. If the file already exists, add thinks under mcp. Run the sign-in command below.',
+
 		'service.tagline': 'Writes, replies and rephrases in your voice',
 		'service.lead':
 			'An MCP connector that learns from your Telegram chats. It generates nothing itself: it hands the model a style profile and your real messages for the request.',
