@@ -115,6 +115,25 @@ function seedCorpus(userId: string) {
 const brief = { name: 'write_as_me', arguments: { brief: 'напиши, что задержусь' } }
 
 describe('OAuth', () => {
+	it('registers all callbacks sent by VS Code', async () => {
+		const res = await fetch(`${http.base}/register`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				client_name: 'Visual Studio Code',
+				redirect_uris: [
+					'https://insiders.vscode.dev/redirect',
+					'https://vscode.dev/redirect',
+					'http://127.0.0.1/',
+					'http://127.0.0.1:33418/',
+				],
+				token_endpoint_auth_method: 'none',
+			}),
+		})
+
+		assert.equal(res.status, 201, await res.text())
+	})
+
 	it('issues tokens for the Cursor and VS Code callbacks', async () => {
 		for (const redirectUri of ['https://www.cursor.com/agents/mcp/oauth/callback', 'https://vscode.dev/redirect']) {
 			const flow = await oauthFlow({ base: http.base, login: widget(OWNER), redirectUri })

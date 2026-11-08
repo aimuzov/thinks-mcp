@@ -82,6 +82,7 @@ export function createApp({ cfg, store, users, builds, publicDir = PUBLIC_DIR }:
 			allowedRedirectUris: [
 				...http.allowedRedirectUris,
 				'https://www.cursor.com/agents/mcp/oauth/callback',
+				'https://insiders.vscode.dev/redirect',
 				'https://vscode.dev/redirect',
 			],
 		},
