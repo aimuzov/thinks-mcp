@@ -4,6 +4,19 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.12.0](https://github.com/aimuzov/thinks-mcp/compare/v0.11.3...v0.12.0) (2026-11-09)
+
+
+### Features
+
+* add MCP setup instructions for more clients ([8a7d654](https://github.com/aimuzov/thinks-mcp/commit/8a7d654ba5c98af2645841a6ba63e72c7c4dd58d))
+* add MCP setup instructions for more clients ([3b4dd79](https://github.com/aimuzov/thinks-mcp/commit/3b4dd79e29ff06c40f7ca5f834ff68afb94b14bd))
+
+
+### Bug Fixes
+
+* accept the full VS Code OAuth registration ([b9e98ff](https://github.com/aimuzov/thinks-mcp/commit/b9e98ffe55797bb25ba7935bc5df5df181e172f1))
+
 ## [0.11.3](https://github.com/aimuzov/thinks-mcp/compare/v0.11.2...v0.11.3) (2026-10-29)
 
 
