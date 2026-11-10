@@ -79,7 +79,7 @@
 		"postcss-nested": "8.0.1",
 		"prettier": "3.9.10",
 		"svelte": "5.57.3",
-		"svelte-check": "4.7.6",
+		"svelte-check": "4.7.8",
 		"typescript": "6.0.3"
 	},
 	"imports": {
