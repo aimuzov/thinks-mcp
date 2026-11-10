@@ -8,6 +8,10 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      build_only:
+        description: Publish candidate images without deploying
+        type: boolean
+        default: false
       tag:
         description: Release tag to publish and deploy, e.g. v1.2.0. Empty deploys the newest main.
         required: false
@@ -43,7 +47,7 @@ jobs:
     # (ручной запуск), но отменённый прогон не публикует.
     if: >-
       !cancelled() && vars.NPM_PUBLISH == 'true' &&
-      (github.event_name == 'workflow_dispatch' && inputs.tag != '' || needs.check.result == 'success')
+      (github.event_name == 'workflow_dispatch' && !inputs.build_only && inputs.tag != '' || needs.check.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -63,7 +67,7 @@ jobs:
   deploy:
     needs: [release, check]
     if: >-
-      !cancelled() && vars.DEPLOY_ENABLED == 'true' &&
+      !cancelled() && vars.DEPLOY_ENABLED == 'true' && vars.DEPLOY_FROM_GHCR != 'true' && !inputs.build_only &&
       (github.event_name == 'workflow_dispatch' || needs.check.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -76,3 +80,36 @@ jobs:
           ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
           url: https://thinks-mcp.aimuzov.online/health
           ref: ${{ needs.release.outputs.tag || inputs.tag }}
+
+  build-app:
+    needs: [release, check]
+    if: >-
+      !cancelled() && (inputs.build_only || (vars.DEPLOY_ENABLED == 'true' && vars.DEPLOY_FROM_GHCR == 'true' && (needs.release.outputs.tag || inputs.tag) != '' && (github.event_name == 'workflow_dispatch' || needs.check.result == 'success')))
+    permissions:
+      contents: read
+      packages: write
+    uses: aimuzov/infra-ci/.github/workflows/build-image.yml@3e762ccf913fdea02f1e43312270c7a4a7e9d335
+    with:
+      ref: ${{ needs.release.outputs.tag || inputs.tag || github.sha }}
+      dockerfile: deploy/Dockerfile
+
+  deploy-registry:
+    needs: [release, build-app]
+    if: >-
+      !cancelled() && !inputs.build_only && needs.build-app.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - id: request
+        env:
+          TAG: ${{ needs.release.outputs.tag || inputs.tag }}
+          REVISION: ${{ needs.build-app.outputs.revision }}
+          IMAGE_APP: ${{ needs.build-app.outputs.image }}
+        run: |
+          printf 'value=images %s %s %s\n' "$TAG" "$REVISION" "${IMAGE_APP##*@}" >> "$GITHUB_OUTPUT"
+      - uses: aimuzov/infra-site-kit/deploy@v5
+        with:
+          ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          url: https://thinks-mcp.aimuzov.online/health
+          ref: ${{ steps.request.outputs.value }}
