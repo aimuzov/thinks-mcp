@@ -10,12 +10,20 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  id-token: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Reuse verified CI
+        id: verified
+        uses: aimuzov/infra-ci/reuse-check@v1
+        continue-on-error: true
+        with:
+          workflow: .github/workflows/check.yml
       - uses: aimuzov/infra-mcp-kit/check@v3
         # Образ собирается и на сервере, но лучше, чтобы он сломался здесь.
         with:
@@ -24,10 +32,17 @@ jobs:
           # Кабинет и вход в настоящем Chromium на собранной статике: CSP режет инлайн-код
           # молча, это видно только в консоли браузера. Chromium ставит и кэширует кит.
           ui: true
+        if: steps.verified.outputs.reused != 'true'
       # Снимки не сравниваем: шрифты на раннере другие, они уходят артефактом.
-      - if: always()
+      - if: steps.verified.outputs.reused != 'true' && (always())
         uses: actions/upload-artifact@v4
         with:
           name: screens
           path: test-results/screens
           if-no-files-found: ignore
+      - name: Record verified CI
+        if: github.event_name == 'pull_request' && steps.verified.outputs.reused != 'true'
+        uses: aimuzov/infra-ci/record-check@v1
+        continue-on-error: true
+        with:
+          workflow: .github/workflows/check.yml
