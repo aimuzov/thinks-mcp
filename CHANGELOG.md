@@ -4,6 +4,13 @@ Versions follow [SemVer](https://semver.org/). From 0.4.0 on release-please
 writes the entries from conventional commits; earlier ones follow
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.13.0](https://github.com/aimuzov/thinks-mcp/compare/v0.12.0...v0.13.0) (2026-11-12)
+
+
+### Features
+
+* build release images in Actions ([3f83f26](https://github.com/aimuzov/thinks-mcp/commit/3f83f266d9b8de4e8093d4e3970f0aa8f24790d5))
+
 ## [0.12.0](https://github.com/aimuzov/thinks-mcp/compare/v0.11.3...v0.12.0) (2026-11-09)
 
 
