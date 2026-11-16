@@ -69,11 +69,11 @@
 	"devDependencies": {
 		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v5.9.1",
 		"@astrojs/check": "0.9.12",
-		"@astrojs/svelte": "9.1.2",
+		"@astrojs/svelte": "9.1.5",
 		"@lucide/svelte": "1.39.0",
 		"@modelcontextprotocol/sdk": "1.32.2",
 		"@types/node": "26.6.5",
-		"astro": "7.4.7",
+		"astro": "7.4.11",
 		"oxlint": "1.87.0",
 		"playwright": "1.64.1",
 		"postcss-nested": "8.0.1",
