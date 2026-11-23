@@ -70,7 +70,7 @@
 		"@aimuzov/infra-site-kit": "github:aimuzov/infra-site-kit#v5.9.1",
 		"@astrojs/check": "0.9.12",
 		"@astrojs/svelte": "9.1.6",
-		"@lucide/svelte": "1.72.0",
+		"@lucide/svelte": "1.76.0",
 		"@modelcontextprotocol/sdk": "1.32.2",
 		"@types/node": "26.6.5",
 		"astro": "7.4.13",
